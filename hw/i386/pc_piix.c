@@ -129,7 +129,11 @@ static void pc_init1(MachineState *machine,
         }
     }
 
-    if (machine->ram_size >= lowmem) {
+    if (vgt_vga_enabled &&
+        machine->ram_size >= 0xc0000000) {
+        above_4g_mem_size = ram_size - 0xc0000000;
+        below_4g_mem_size = 0xc0000000;
+    } else if (machine->ram_size >= lowmem) {
         above_4g_mem_size = machine->ram_size - lowmem;
         below_4g_mem_size = lowmem;
     } else {
@@ -234,7 +238,19 @@ static void pc_init1(MachineState *machine,
 
     pc_register_ferr_irq(gsi[13]);
 
-    pc_vga_init(isa_bus, pci_enabled ? pci_bus : NULL);
+    /*
+     * Initialize XenGT hooks before normal VGA init. The
+     * ideal case is to have IGD presented as the primary
+     * graphics card in 00:02.0, and then have other emulated
+     * PCI VGA card all disabled. We still rely on Qemu to
+     * emulate legacy ISA ports, so requires the ISA vga logic.
+     */
+    if (vgt_vga_enabled && pci_enabled) {
+        vgt_vga_init(pci_bus);
+        isa_create_simple(isa_bus, "isa-vga");
+    } else {
+        pc_vga_init(isa_bus, pci_enabled ? pci_bus : NULL);
+    }
 
     assert(pc_machine->vmport != ON_OFF_AUTO_MAX);
     if (pc_machine->vmport == ON_OFF_AUTO_AUTO) {

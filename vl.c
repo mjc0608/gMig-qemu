@@ -1886,6 +1886,8 @@ static void select_vgahw (const char *p)
             fprintf(stderr, "Error: standard VGA not available\n");
             exit(0);
         }
+    } else if (strstart(p, "xengt", &opts)) {
+        vga_interface_type = VGA_VGT;
     } else if (strstart(p, "cirrus", &opts)) {
         if (cirrus_vga_available()) {
             vga_interface_type = VGA_CIRRUS;
@@ -3751,6 +3753,24 @@ int main(int argc, char **argv, char **envp)
                 if (vmstate_dump_file == NULL) {
                     fprintf(stderr, "open %s: %s\n", optarg, strerror(errno));
                     exit(1);
+                }
+                break;
+            case QEMU_OPTION_vgt_low_gm_sz:
+                {
+                    char *ptr;
+                    vgt_low_gm_sz = strtol(optarg, &ptr, 10);
+                }
+                break;
+            case QEMU_OPTION_vgt_high_gm_sz:
+                {
+                    char *ptr;
+                    vgt_high_gm_sz = strtol(optarg, &ptr, 10);
+                }
+                break;
+            case QEMU_OPTION_vgt_fence_sz:
+                {
+                    char *ptr;
+                    vgt_fence_sz = strtol(optarg, &ptr, 10);
                 }
                 break;
             default:

@@ -258,6 +258,8 @@ int isa_vga_mm_init(hwaddr vram_base,
                     MemoryRegion *address_space);
 
 /* vgt_vga.c */
+#define VGT_OPREGION_SIZE 0x2000
+
 extern int vgt_low_gm_sz;
 extern int vgt_high_gm_sz;
 extern int vgt_fence_sz;
@@ -267,6 +269,7 @@ DeviceState *vgt_vga_init(PCIBus *pci_bus);
 void vgt_bridge_pci_conf_init(PCIDevice *dev);
 void vgt_bridge_pci_write(PCIDevice *dev,
                           uint32_t address, uint32_t val, int len);
+void vgt_kvm_set_opregion_addr(uint32_t addr);
 
 /* ne2000.c */
 static inline bool isa_ne2000_init(ISABus *bus, int base, int irq, NICInfo *nd)

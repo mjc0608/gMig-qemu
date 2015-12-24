@@ -289,6 +289,14 @@ static void pc_init1(MachineState *machine,
         }
     }
 
+#ifdef CONFIG_KVM
+    if (vgt_vga_enabled && kvm_enabled()) {
+        below_4g_mem_size = (below_4g_mem_size - VGT_OPREGION_SIZE) & ~0xfff;
+        vgt_kvm_set_opregion_addr((below_4g_mem_size -
+                                  VGT_OPREGION_SIZE) & ~0xfff);
+    }
+#endif
+
     pc_cmos_init(below_4g_mem_size, above_4g_mem_size, machine->boot_order,
                  machine, floppy, idebus[0], idebus[1], rtc_state);
 

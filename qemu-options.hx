@@ -1099,7 +1099,7 @@ Rotate graphical output some deg left (only PXA LCD).
 ETEXI
 
 DEF("vga", HAS_ARG, QEMU_OPTION_vga,
-    "-vga [std|cirrus|vmware|qxl|xenfb|tcx|cg3|xengt|none]\n"
+    "-vga [std|cirrus|vmware|qxl|xenfb|tcx|cg3|xengt|vgt|none]\n"
     "                select video card type\n", QEMU_ARCH_ALL)
 STEXI
 @item -vga @var{type}
@@ -1175,6 +1175,15 @@ STEXI
 @item -vgt_monitor_config_file @var{file}
 @findex -vgt_monitor_config_file
 Use @var{file} to config monitor while creating vgt instance.
+ETEXI
+
+DEF("vgt", 0, QEMU_OPTION_vgt,
+    "-vgt    enable Intel GVT-g Technology\n",
+    QEMU_ARCH_I386)
+STEXI
+@item -vgt
+@findex -vga
+Enable Intel GVT-g Technology
 ETEXI
 
 DEF("full-screen", 0, QEMU_OPTION_full_screen,

@@ -144,6 +144,7 @@ static int rtc_utc = 1;
 static int rtc_date_offset = -1; /* -1 means no change */
 QEMUClockType rtc_clock;
 int vga_interface_type = VGA_NONE;
+int vgt = 0;
 static int full_screen = 0;
 static int no_frame = 0;
 int no_quit = 0;
@@ -1888,6 +1889,13 @@ static void select_vgahw (const char *p)
         }
     } else if (strstart(p, "xengt", &opts)) {
         vga_interface_type = VGA_VGT;
+    } else if (strstart(p, "vgt", &opts)) {
+        if (vgt) {
+            vga_interface_type = VGA_VGT;
+        } else {
+            fprintf(stderr, "Error: VGA is vgt, but -vgt not specified!\n");
+            exit(0);
+        }
     } else if (strstart(p, "cirrus", &opts)) {
         if (cirrus_vga_available()) {
             vga_interface_type = VGA_CIRRUS;
@@ -3777,6 +3785,9 @@ int main(int argc, char **argv, char **envp)
                 {
                     vgt_monitor_config_file = optarg;
                 }
+                break;
+            case QEMU_OPTION_vgt:
+                vgt = 1;
                 break;
             default:
                 os_parse_cmd_args(popt->index, optarg);

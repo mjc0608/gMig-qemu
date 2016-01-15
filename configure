@@ -2264,6 +2264,13 @@ fi
 # Intel GVT-g detection
 if test "$vgt" = "yes" ; then
   vgt="yes"
+  if test "$sdl" = "yes" ; then
+    vgt_libs="-ldrm -lGL -lEGL -ludev"
+    libs_softmmu="$vgt_libs $libs_softmmu"
+    QEMU_CFLAGS="-I/usr/include/drm $QEMU_CFLAGS"
+  else
+    echo "Intel VGT indirect display disabled due to SDL disabled"
+  fi
 fi
 
 ##########################################

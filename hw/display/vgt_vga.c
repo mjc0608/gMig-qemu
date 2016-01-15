@@ -74,6 +74,12 @@ int vgt_fence_sz = 4;
 int vgt_primary = 1; /* -1 means "not specified */
 const char *vgt_monitor_config_file = NULL;
 
+int guest_domid = 0;
+int get_guest_domid(void)
+{
+    return guest_domid;
+}
+
 static int vgt_host_pci_cfg_get(VGTHostDevice *host_dev,
                                 void *data, int len, uint32_t addr);
 
@@ -661,6 +667,7 @@ static int vgt_get_domid(void)
         domid = xen_domid;
     }
     assert(domid > 0);
+    guest_domid = domid;
 
     return domid;
 }

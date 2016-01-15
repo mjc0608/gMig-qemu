@@ -4310,7 +4310,11 @@ int main(int argc, char **argv, char **envp)
 #endif
 #if defined(CONFIG_SDL)
     case DT_SDL:
-        sdl_display_init(ds, full_screen, no_frame);
+        if (vgt_vga_enabled) {
+            intel_vgt_display_init(ds, full_screen, no_frame);
+        } else {
+            sdl_display_init(ds, full_screen, no_frame);
+        }
         break;
 #elif defined(CONFIG_COCOA)
     case DT_SDL:

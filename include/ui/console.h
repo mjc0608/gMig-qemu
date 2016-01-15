@@ -324,6 +324,9 @@ DisplaySurface *qemu_console_surface(QemuConsole *con);
 /* sdl.c */
 void sdl_display_init(DisplayState *ds, int full_screen, int no_frame);
 
+/* intel_vgt.c */
+void intel_vgt_display_init(DisplayState *ds, int full_screen, int no_frame);
+
 /* cocoa.m */
 void cocoa_display_init(DisplayState *ds, int full_screen);
 

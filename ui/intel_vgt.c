@@ -40,6 +40,7 @@ static int fbWidth = 0;
 static int fbHeight = 0;
 
 static int vm_pipe = UINT_MAX;
+static bool dma_buf_mode = false;
 
 static int winWidth = 1024;
 static int winHeight = 768;
@@ -211,18 +212,8 @@ static void create_cursor_buffer(void)
     int width = 0, height = 0, stride = 0;
     struct drm_i915_gem_vgtbuffer vcreate;
     int r;
-    int name = 0;
-    EGLint attribs[] = {
-        EGL_WIDTH, width,
-        EGL_HEIGHT, height,
-        EGL_LINUX_DRM_FOURCC_EXT, DRM_FORMAT_ARGB8888,
-        EGL_DMA_BUF_PLANE0_FD_EXT, name,
-        EGL_DMA_BUF_PLANE0_OFFSET_EXT, 0,
-        EGL_DMA_BUF_PLANE0_PITCH_EXT, stride,
-        EGL_NONE
-    };
     EGLImageKHR namedimage;
-    struct drm_prime_handle prime;
+    unsigned long name;
 
     memset(&vcreate, 0, sizeof(struct drm_i915_gem_vgtbuffer));
     width = 64;
@@ -245,10 +236,18 @@ static void create_cursor_buffer(void)
     cursor_list.l[r].age = 0;
     current_cursor_textureId = cursortextureId;
 
-    prime.handle = vcreate.handle;
-    prime.flags = DRM_CLOEXEC;
-    drmIoctl(fd, DRM_IOCTL_PRIME_HANDLE_TO_FD, &prime);
-    name = prime.fd;
+    if (dma_buf_mode) {
+        struct drm_prime_handle prime;
+        prime.handle = vcreate.handle;
+        prime.flags = DRM_CLOEXEC;
+        drmIoctl(fd, DRM_IOCTL_PRIME_HANDLE_TO_FD, &prime);
+        name = prime.fd;
+    } else {
+        struct drm_gem_flink flink;
+        flink.handle = vcreate.handle;
+        drmIoctl(fd, DRM_IOCTL_GEM_FLINK, &flink);
+        name = flink.name;
+    }
 
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -256,13 +255,29 @@ static void create_cursor_buffer(void)
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_TRUE);
 
-    attribs[1] = width;
-    attribs[3] = height;
-    attribs[7] = name;
-    attribs[11] = stride;
-
-    namedimage = eglCreateImageKHR(dpy, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT,
-                                   NULL, attribs);
+    if (dma_buf_mode) {
+        EGLint attribs[] = {
+            EGL_WIDTH, width,
+            EGL_HEIGHT, height,
+            EGL_LINUX_DRM_FOURCC_EXT, DRM_FORMAT_ARGB8888,
+            EGL_DMA_BUF_PLANE0_FD_EXT, (int)name,
+            EGL_DMA_BUF_PLANE0_OFFSET_EXT, 0,
+            EGL_DMA_BUF_PLANE0_PITCH_EXT, stride,
+            EGL_NONE
+        };
+        namedimage = eglCreateImageKHR(dpy, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT,
+                                       NULL, attribs);
+    } else {
+        EGLint attribs[] = {
+            EGL_WIDTH, width,
+            EGL_HEIGHT, height,
+            EGL_DRM_BUFFER_STRIDE_MESA, stride / 4,
+            EGL_DRM_BUFFER_FORMAT_MESA, EGL_DRM_BUFFER_FORMAT_ARGB32_MESA,
+            EGL_NONE
+        };
+        namedimage = eglCreateImageKHR(dpy, ctx, EGL_DRM_BUFFER_MESA,
+                                       (EGLClientBuffer)name, attribs);
+    }
     glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, namedimage);
     eglDestroyImageKHR(dpy, namedimage);
 }
@@ -272,18 +287,8 @@ static void create_primary_buffer(void)
     struct drm_i915_gem_vgtbuffer vcreate;
     int width = 0, height = 0 ,stride = 0;
     int r;
-    int name = 0;
-    EGLint attribs[] = {
-        EGL_WIDTH, width,
-        EGL_HEIGHT, height,
-        EGL_LINUX_DRM_FOURCC_EXT, DRM_FORMAT_ARGB8888,
-        EGL_DMA_BUF_PLANE0_FD_EXT, name,
-        EGL_DMA_BUF_PLANE0_OFFSET_EXT, 0,
-        EGL_DMA_BUF_PLANE0_PITCH_EXT, stride,
-        EGL_NONE
-    };
     EGLImageKHR namedimage;
-    struct drm_prime_handle prime;
+    unsigned long name;
 
     memset(&vcreate, 0, sizeof(struct drm_i915_gem_vgtbuffer));
     width = 0;
@@ -317,10 +322,18 @@ static void create_primary_buffer(void)
     primary_list.l[r].age = 0;
     current_textureId = textureId;
 
-    prime.handle = vcreate.handle;
-    prime.flags = DRM_CLOEXEC;
-    drmIoctl(fd, DRM_IOCTL_PRIME_HANDLE_TO_FD, &prime);
-    name = prime.fd;
+    if (dma_buf_mode) {
+        struct drm_prime_handle prime;
+        prime.handle = vcreate.handle;
+        prime.flags = DRM_CLOEXEC;
+        drmIoctl(fd, DRM_IOCTL_PRIME_HANDLE_TO_FD, &prime);
+        name = prime.fd;
+    } else {
+        struct drm_gem_flink flink;
+        flink.handle = vcreate.handle;
+        drmIoctl(fd, DRM_IOCTL_GEM_FLINK, &flink);
+        name = flink.name;
+    }
 
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -328,13 +341,29 @@ static void create_primary_buffer(void)
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_TRUE);
 
-    attribs[1] = width;
-    attribs[3] = height;
-    attribs[7] = name;
-    attribs[11] = stride;
-
-    namedimage = eglCreateImageKHR(dpy, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT,
-                                   NULL, attribs);
+    if (dma_buf_mode) {
+        EGLint attribs[] = {
+            EGL_WIDTH, width,
+            EGL_HEIGHT, height,
+            EGL_LINUX_DRM_FOURCC_EXT, DRM_FORMAT_ARGB8888,
+            EGL_DMA_BUF_PLANE0_FD_EXT, name,
+            EGL_DMA_BUF_PLANE0_OFFSET_EXT, 0,
+            EGL_DMA_BUF_PLANE0_PITCH_EXT, stride,
+            EGL_NONE
+        };
+        namedimage = eglCreateImageKHR(dpy, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT,
+                                       NULL, attribs);
+    } else {
+        EGLint attribs[] = {
+            EGL_WIDTH, width,
+            EGL_HEIGHT, height,
+            EGL_DRM_BUFFER_STRIDE_MESA, stride / 4,
+            EGL_DRM_BUFFER_FORMAT_MESA, EGL_DRM_BUFFER_FORMAT_ARGB32_MESA,
+            EGL_NONE
+        };
+        namedimage = eglCreateImageKHR(dpy, ctx, EGL_DRM_BUFFER_MESA,
+                                       (EGLClientBuffer)name, attribs);
+    }
     glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, namedimage);
     eglDestroyImageKHR(dpy, namedimage);
 }
@@ -639,16 +668,26 @@ static bool check_egl(void)
 {
     EGLDisplay d = eglGetDisplay(EGL_DEFAULT_DISPLAY);
     bool ret = true;
+    char *egl_ext;
+
     if (!eglInitialize(d, NULL, NULL)) {
         fprintf(stderr, "eglInitialize failed\n");
         exit(1);
     }
-    eglQueryString(d, EGL_EXTENSIONS);
-    if (!strstr(eglQueryString(d, EGL_EXTENSIONS), "EGL_KHR_image_base")) {
+    egl_ext = (char *)eglQueryString(d, EGL_EXTENSIONS);
+    if (!strstr(egl_ext, "EGL_KHR_image_base")) {
         fprintf(stderr, "no egl extensions found. Intel GVT-g indirect display will be disabled\n");
         ret = false;
     } else {
         fprintf(stderr, "egl extensions found. Intel GVT-g indirect display will be enabled\n");
+        if (strstr(egl_ext, "EGL_EXT_image_dma_buf_import") &&
+            strstr(egl_ext, "EGL_MESA_image_dma_buf_export")) {
+            dma_buf_mode = true;
+            fprintf(stderr, "Use dma-buf to get guest framebuffer\n");
+        } else {
+            dma_buf_mode = false;
+            fprintf(stderr, "Use flink to get guest framebuffer\n");
+        }
     }
     eglTerminate(d);
 

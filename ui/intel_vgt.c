@@ -1,3 +1,12 @@
+/*
+ * QEMU Intel GVT-g indirect display support
+ *
+ * Copyright (c) Intel
+ *
+ * This work is licensed under the terms of the GNU GPL, version 2.  See
+ * the COPYING file in the top-level directory.
+ *
+ */
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>

@@ -877,8 +877,6 @@ old style -sdl/-curses/... options. Valid values for @var{type} are
 @item sdl
 Display video output via SDL (usually in a separate graphics
 window; see the SDL documentation for other possibilities).
-@item vgt
-Intel GVT-g technology
 @item curses
 Display video output via curses. For graphics device models which
 support a text mode, QEMU can display this output using a
@@ -1101,7 +1099,7 @@ Rotate graphical output some deg left (only PXA LCD).
 ETEXI
 
 DEF("vga", HAS_ARG, QEMU_OPTION_vga,
-    "-vga [std|cirrus|vmware|qxl|xenfb|tcx|cg3|xengt|vgt|none]\n"
+    "-vga [std|cirrus|vmware|qxl|xenfb|tcx|cg3|vgt|none]\n"
     "                select video card type\n", QEMU_ARCH_ALL)
 STEXI
 @item -vga @var{type}
@@ -1134,7 +1132,7 @@ fixed resolution of 1024x768.
 (sun4m only) Sun cgthree framebuffer. This is a simple 8-bit framebuffer
 for sun4m machines available in both 1024x768 (OpenBIOS) and 1152x900 (OBP)
 resolutions aimed at people wishing to run older Solaris versions.
-@item xengt
+@item vgt
 Intel IGD card based on mediated pass-through technique. A single
 IGD card can be used to accelerate multiple VMs, which each run
 native graphics driver inside.

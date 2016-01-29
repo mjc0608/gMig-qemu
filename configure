@@ -2263,13 +2263,23 @@ fi
 ##########################################
 # Intel GVT-g detection
 if test "$vgt" = "yes" ; then
-  vgt="yes"
-  if test "$sdl" = "yes" ; then
-    vgt_libs="-ldrm -lGL -lEGL -ludev"
-    libs_softmmu="$vgt_libs $libs_softmmu"
-    QEMU_CFLAGS="-I/usr/include/drm $QEMU_CFLAGS"
+  cat > $TMPC <<EOF
+#include <EGL/egl.h>
+int main(void) { return 0; }
+EOF
+  vgt_cflags=`$pkg_config --cflags egl 2> /dev/null`
+  if compile_prog "$vgt_cflags" "" ; then
+    if test "$sdl" = "yes" ; then
+      vgt="yes"
+      vgt_libs=`$pkg_config --libs libdrm gl egl libudev 2> /dev/null`
+      libs_softmmu="$vgt_libs $libs_softmmu"
+      QEMU_CFLAGS="$vgt_cflags $QEMU_CFLAGS"
+    else
+      error_exit "Intel VGT indirect display enabled but SDL disabled!" \
+          "Please enable SDL or disable Intel VGT indirect display."
+    fi
   else
-    echo "Intel VGT indirect display disabled due to SDL disabled"
+    error_exit " EGL library missed. Please install EGL library first."
   fi
 fi
 

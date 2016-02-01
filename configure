@@ -2267,19 +2267,18 @@ if test "$vgt" = "yes" ; then
 #include <EGL/egl.h>
 int main(void) { return 0; }
 EOF
-  vgt_cflags=`$pkg_config --cflags egl 2> /dev/null`
-  if compile_prog "$vgt_cflags" "" ; then
-    if test "$sdl" = "yes" ; then
-      vgt="yes"
+  vgt="yes"
+  if test "$sdl" = "yes" ; then
+    vgt_cflags=`$pkg_config --cflags egl 2> /dev/null`
+    if compile_prog "$vgt_cflags" "" ; then
       vgt_libs=`$pkg_config --libs libdrm gl egl libudev 2> /dev/null`
       libs_softmmu="$vgt_libs $libs_softmmu"
       QEMU_CFLAGS="$vgt_cflags $QEMU_CFLAGS"
     else
-      error_exit "Intel VGT indirect display enabled but SDL disabled!" \
-          "Please enable SDL or disable Intel VGT indirect display."
+      error_exit "EGL library missed. Please EGL library first."
     fi
   else
-    error_exit " EGL library missed. Please install EGL library first."
+    echo "Intel VGT indirect display will be disabled due to SDL disabled!"
   fi
 fi
 

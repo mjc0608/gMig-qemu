@@ -326,6 +326,7 @@ void sdl_display_init(DisplayState *ds, int full_screen, int no_frame);
 
 /* intel_vgt.c */
 void intel_vgt_display_init(DisplayState *ds, int full_screen, int no_frame);
+bool intel_vgt_check_composite_display(void);
 
 /* cocoa.m */
 void cocoa_display_init(DisplayState *ds, int full_screen);

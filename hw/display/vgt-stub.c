@@ -32,3 +32,7 @@ void vgt_bridge_pci_write(PCIDevice *dev,
  void intel_vgt_display_init(DisplayState *ds, int full_screen, int no_frame)
 {
 }
+
+bool intel_vgt_check_composite_display(void)
+{
+}

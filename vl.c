@@ -4310,7 +4310,7 @@ int main(int argc, char **argv, char **envp)
 #endif
 #if defined(CONFIG_SDL)
     case DT_SDL:
-        if (vgt_vga_enabled) {
+        if (vgt_vga_enabled && intel_vgt_check_composite_display()) {
             intel_vgt_display_init(ds, full_screen, no_frame);
         } else {
             sdl_display_init(ds, full_screen, no_frame);

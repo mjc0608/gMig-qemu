@@ -103,6 +103,7 @@ struct drm_i915_gem_vgtbuffer {
         __u32 flags;
 #define I915_VGTBUFFER_READ_ONLY (1<<0)
 #define I915_VGTBUFFER_QUERY_ONLY (1<<1)
+#define I915_VGTBUFFER_CHECK_CAPABILITY (1<<2)
 #define I915_VGTBUFFER_UNSYNCHRONIZED 0x80000000
         /**
          * Returned handle for the object.
@@ -612,8 +613,6 @@ static void vgt_init(void)
     sur = eglCreateWindowSurface(dpy, conf, info.info.x11.window, NULL);
     eglMakeCurrent(dpy, sur, sur, ctx);
 
-    fd = open("/dev/dri/card0", O_RDWR);
-
     primary_list.l = malloc(PRIMARY_LIST_LEN*sizeof(struct buffer_rec));
     primary_list.len = PRIMARY_LIST_LEN;
     cursor_list.l = malloc(CURSOR_LIST_LEN*sizeof(struct buffer_rec));
@@ -692,6 +691,20 @@ static bool check_egl(void)
     eglTerminate(d);
 
     return ret;
+}
+
+bool intel_vgt_check_composite_display(void)
+{
+    struct drm_i915_gem_vgtbuffer vcreate;
+
+    fd = open("/dev/dri/card0", O_RDWR);
+    memset(&vcreate, 0, sizeof(struct drm_i915_gem_vgtbuffer));
+    vcreate.flags = I915_VGTBUFFER_CHECK_CAPABILITY;
+    if (!drmIoctl(fd, DRM_IOCTL_I915_GEM_VGTBUFFER, &vcreate)) {
+        return true;
+    } else {
+        return false;
+    }
 }
 
 void intel_vgt_display_init(DisplayState *ds, int full_screen, int no_frame)

@@ -71,6 +71,7 @@ struct buffer_list cursor_list;
 
 static EGLDisplay dpy;
 static EGLContext ctx;
+static EGLSurface sur;
 
 PFNGLEGLIMAGETARGETTEXTURE2DOESPROC glEGLImageTargetTexture2DOES;
 PFNEGLCREATEIMAGEKHRPROC eglCreateImageKHR;
@@ -572,7 +573,7 @@ static void intel_vgt_refresh(DisplayChangeListener *dcl)
     check_for_new_primary_buffer();
     check_for_new_cursor_buffer(&x, &y);
     draw(x, y);
-    SDL_GL_SwapBuffers();
+    eglSwapBuffers(dpy, sur);
 }
 
 static void vgt_init(void)
@@ -596,7 +597,6 @@ static void vgt_init(void)
     EGLint num_conf;
     SDL_SysWMinfo info;
     EGLConfig conf;
-    EGLSurface sur;
 
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_SetVideoMode(winWidth, winHeight, 32, SDL_OPENGL | SDL_RESIZABLE);

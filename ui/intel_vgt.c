@@ -614,8 +614,16 @@ static void vgt_init(void)
     eglMakeCurrent(dpy, sur, sur, ctx);
 
     primary_list.l = malloc(PRIMARY_LIST_LEN*sizeof(struct buffer_rec));
+    if (primary_list.l == NULL) {
+        fprintf(stderr, "allocate primary list failed\n");
+        exit(1);
+    }
     primary_list.len = PRIMARY_LIST_LEN;
     cursor_list.l = malloc(CURSOR_LIST_LEN*sizeof(struct buffer_rec));
+    if (cursor_list.l == NULL) {
+        fprintf(stderr, "allocate cursor list failed\n");
+        exit(1);
+    }
     cursor_list.len = CURSOR_LIST_LEN;
     for (i = 0; i < primary_list.len; i++) {
         primary_list.l[i].start = 0;

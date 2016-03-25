@@ -182,6 +182,13 @@ static void pc_init1(MachineState *machine,
                             mc->name, smbios_legacy_mode, smbios_uuid_encoded);
     }
 
+#ifdef CONFIG_KVM
+    if (vgt_vga_enabled && kvm_enabled()) {
+        vgt_kvm_set_opregion_addr((below_4g_mem_size -
+                                  VGT_OPREGION_SIZE) & ~0xfff);
+    }
+#endif
+
     /* allocate ram and load rom/bios */
     if (!xen_enabled()) {
         fw_cfg = pc_memory_init(machine, system_memory,
@@ -292,8 +299,6 @@ static void pc_init1(MachineState *machine,
 #ifdef CONFIG_KVM
     if (vgt_vga_enabled && kvm_enabled()) {
         below_4g_mem_size = (below_4g_mem_size - VGT_OPREGION_SIZE) & ~0xfff;
-        vgt_kvm_set_opregion_addr((below_4g_mem_size -
-                                  VGT_OPREGION_SIZE) & ~0xfff);
     }
 #endif
 

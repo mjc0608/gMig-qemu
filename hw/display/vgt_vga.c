@@ -382,14 +382,13 @@ static void finish_post(PCIDevice *pci_dev)
     }
 }
 
-static void vgt_opregion_reserve_mem(void)
+static void vgt_opregion_prepare_mem(void)
 {
     memory_region_init_ram(&opregion_mr, NULL, "opregion.ram",
                            VGT_OPREGION_SIZE, NULL);
     vmstate_register_ram_global(&opregion_mr);
     memory_region_add_subregion(get_system_memory(),
                                 vgt_kvm_opregion_addr, &opregion_mr);
-    e820_add_entry(vgt_kvm_opregion_addr, VGT_OPREGION_SIZE, E820_RESERVED);
 }
 
 static void vgt_opregion_init(void)
@@ -397,7 +396,7 @@ static void vgt_opregion_init(void)
     KVMState *s = kvm_state;
     int ret;
 
-    vgt_opregion_reserve_mem();
+    vgt_opregion_prepare_mem();
     ret = kvm_vm_ioctl(s, KVM_VGT_SET_OPREGION, &vgt_kvm_opregion_addr);
     if (ret < 0) {
         DPRINTF("kvm_vm_ioctl KVM_VGT_SET_OPREGION failed: ret = %d\n", ret);

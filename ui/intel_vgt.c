@@ -60,6 +60,8 @@ typedef struct buffer_rec{
     uint32_t start;
     GLuint textureId;
     int age;
+    uint8_t tiled;
+    uint32_t size;
 } buffer_rec;
 
 typedef struct buffer_list{
@@ -168,14 +170,22 @@ static void reshape(int width, int height)
     glViewport(0, 0, width, height);
 }
 
-static int find_rec(struct buffer_list *l, uint32_t start)
+static int find_rec(struct buffer_list *l, struct drm_i915_gem_vgtbuffer
+                    *vgtbuffer)
 {
     int i, r;
 
     r = -1;
     for (i = 0; i < l->len; i++) {
-        if (l->l[i].start == start) {
+        if (l->l[i].start == vgtbuffer->start &&
+            l->l[i].tiled == vgtbuffer->tiled &&
+            l->l[i].size == vgtbuffer->size) {
             r = i;
+            break;
+        } else if (l->l[i].start == vgtbuffer->start) {
+            memset(&(l->l[i]), 0, sizeof(struct buffer_list));
+            l->l[i].age = INT_MAX;
+            break;
         }
     }
 
@@ -241,6 +251,8 @@ static void create_cursor_buffer(void)
     cursor_list.l[r].start = current_cursor_fb_addr;
     cursor_list.l[r].textureId = cursortextureId;
     cursor_list.l[r].age = 0;
+    cursor_list.l[r].tiled = 0;
+    cursor_list.l[r].size = vcreate.size;
     current_cursor_textureId = cursortextureId;
 
     if (dma_buf_mode) {
@@ -321,6 +333,8 @@ static void create_primary_buffer(void)
     primary_list.l[r].start = current_primary_fb_addr;
     primary_list.l[r].textureId = textureId;
     primary_list.l[r].age = 0;
+    primary_list.l[r].tiled = vcreate.tiled;
+    primary_list.l[r].size = vcreate.size;
     current_textureId = textureId;
 
     if (dma_buf_mode) {
@@ -392,7 +406,7 @@ static void check_for_new_primary_buffer(void)
 
     start = vcreate.start;
     if ((start != current_primary_fb_addr)) {
-        r = find_rec(&primary_list, start);
+        r = find_rec(&primary_list, &vcreate);
         age_list(&primary_list);
 
         if (r >= 0) {
@@ -430,7 +444,7 @@ static void check_for_new_cursor_buffer(int *x, int *y)
 
     if (cursorstart != current_cursor_fb_addr) {
         current_cursor_fb_addr = cursorstart;
-        r = find_rec(&cursor_list, cursorstart);
+        r = find_rec(&cursor_list, &vcreate);
         age_list(&cursor_list);
         if (r >= 0) {
             cursor_list.l[r].age = 0;

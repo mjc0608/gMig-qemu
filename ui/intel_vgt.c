@@ -278,7 +278,8 @@ static void create_cursor_buffer(void)
         EGLint attribs[] = {
             EGL_WIDTH, width,
             EGL_HEIGHT, height,
-            EGL_LINUX_DRM_FOURCC_EXT, DRM_FORMAT_ARGB8888,
+            EGL_LINUX_DRM_FOURCC_EXT,
+            vcreate.drm_format > 0 ? vcreate.drm_format : DRM_FORMAT_ARGB8888,
             EGL_DMA_BUF_PLANE0_FD_EXT, (int)name,
             EGL_DMA_BUF_PLANE0_OFFSET_EXT, 0,
             EGL_DMA_BUF_PLANE0_PITCH_EXT, stride,
@@ -287,6 +288,10 @@ static void create_cursor_buffer(void)
         namedimage = eglCreateImageKHR(dpy, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT,
                                        NULL, attribs);
     } else {
+        /* Only EGL_DRM_BUFFER_FORMAT_ARGB32_MESA format is supported so if
+           some app(like Heaven) use their own buffer format rather than
+           the ARGB32 then the color display maybe go wrong.
+        */
         EGLint attribs[] = {
             EGL_WIDTH, width,
             EGL_HEIGHT, height,
@@ -360,7 +365,8 @@ static void create_primary_buffer(void)
         EGLint attribs[] = {
             EGL_WIDTH, width,
             EGL_HEIGHT, height,
-            EGL_LINUX_DRM_FOURCC_EXT, DRM_FORMAT_ARGB8888,
+            EGL_LINUX_DRM_FOURCC_EXT,
+            vcreate.drm_format > 0 ? vcreate.drm_format : DRM_FORMAT_ARGB8888,
             EGL_DMA_BUF_PLANE0_FD_EXT, name,
             EGL_DMA_BUF_PLANE0_OFFSET_EXT, 0,
             EGL_DMA_BUF_PLANE0_PITCH_EXT, stride,
@@ -369,6 +375,10 @@ static void create_primary_buffer(void)
         namedimage = eglCreateImageKHR(dpy, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT,
                                        NULL, attribs);
     } else {
+        /* Only EGL_DRM_BUFFER_FORMAT_ARGB32_MESA format is supported so if
+           some app(like Heaven) use their own buffer format rather than
+           the ARGB32 then the color display maybe go wrong.
+        */
         EGLint attribs[] = {
             EGL_WIDTH, width,
             EGL_HEIGHT, height,

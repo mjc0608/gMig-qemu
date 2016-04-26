@@ -555,7 +555,7 @@ void handle_activation(SDL_Event *ev);
 static void intel_vgt_refresh(DisplayChangeListener *dcl)
 {
     SDL_Event event;
-    int x, y;
+    int x =0, y = 0;
 
     if (last_vm_running != runstate_is_running()) {
         last_vm_running = runstate_is_running();

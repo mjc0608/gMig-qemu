@@ -340,8 +340,13 @@ ram_addr_t xen_ram_addr_from_mapcache(void *ptr)
     }
 
     entry = &mapcache->entry[paddr_index % mapcache->nr_buckets];
-    while (entry && (entry->paddr_index != paddr_index || entry->size != size ||
-             !(((unsigned long)ptr >= (unsigned long)entry->vaddr_base) && ((unsigned long) ptr < (unsigned long) entry->vaddr_base + (unsigned long)entry->size)))) {
+    while (entry && (entry->paddr_index != paddr_index || entry->size != size  ||
+            !(((unsigned long)ptr >= (unsigned long)entry->vaddr_base) &&
+              ((unsigned long) ptr < (unsigned long) entry->vaddr_base + (unsigned long)entry->size)) ||
+              !test_bits(((unsigned long) ptr - (unsigned long) entry->vaddr_base) >> XC_PAGE_SHIFT,
+              1,
+             entry->valid_mapping))) {
+
         entry = entry->next;
     }
     if (!entry) {
@@ -388,7 +393,11 @@ static void xen_invalidate_map_cache_entry_unlocked(uint8_t *buffer)
 
     entry = &mapcache->entry[paddr_index % mapcache->nr_buckets];
     while (entry && (entry->paddr_index != paddr_index || entry->size != size ||
-             !(((unsigned long)buffer >= (unsigned long)entry->vaddr_base) && ((unsigned long) buffer < (unsigned long) entry->vaddr_base + (unsigned long)entry->size)))) {
+        !(((unsigned long)buffer >= (unsigned long)entry->vaddr_base)
+        && ((unsigned long) buffer < (unsigned long) entry->vaddr_base + (unsigned long)entry->size)) ||
+        !test_bits(((unsigned long) buffer - (unsigned long) entry->vaddr_base) >> XC_PAGE_SHIFT,
+        1,
+        entry->valid_mapping))) {
         pentry = entry;
         entry = entry->next;
     }

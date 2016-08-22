@@ -314,6 +314,10 @@ static void create_cursor_buffer(void)
     }
     glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, namedimage);
     eglDestroyImageKHR(dpy, namedimage);
+
+    if (dma_buf_mode) {
+        close(name);
+    }
 }
 
 static void create_primary_buffer(void)
@@ -411,6 +415,10 @@ static void create_primary_buffer(void)
     }
     glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, namedimage);
     eglDestroyImageKHR(dpy, namedimage);
+
+    if (dma_buf_mode) {
+        close(name);
+    }
 }
 
 static void check_for_new_primary_buffer(void)

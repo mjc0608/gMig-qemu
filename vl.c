@@ -3797,6 +3797,12 @@ int main(int argc, char **argv, char **envp)
                     vgt_fence_sz = strtol(optarg, &ptr, 10);
                 }
                 break;
+            case QEMU_OPTION_vgt_cap:
+                {
+                   char *ptr;
+                   vgt_cap = strtol(optarg, &ptr, 10);
+                }
+		break;
             case QEMU_OPTION_vgt_monitor_config_file:
                 {
                     vgt_monitor_config_file = optarg;

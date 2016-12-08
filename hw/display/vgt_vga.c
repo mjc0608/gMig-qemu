@@ -1119,10 +1119,6 @@ static void put_snapshot(QEMUFile *f, void *pv, size_t size)
     /* Sending VM: Read snapshot and write to qemu file*/
     read_write_snapshot(f, d, 1);
 
-    /* recreate vGPU instance */
-    destroy_vgt_instance(d->domid);
-    create_vgt_instance(d);
-    /* set vgt to run as we have new instance */
     d->vgt_paused = false;
 }
 

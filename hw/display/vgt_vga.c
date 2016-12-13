@@ -1138,6 +1138,8 @@ static void put_snapshot(QEMUFile *f, void *pv, size_t size)
             xen_modified_memory(start_pfn << TARGET_PAGE_BITS,
                 (end_pfn - start_pfn) * TARGET_PAGE_SIZE);
         }
+
+        g_free(bitmap);
     }
 
     /* Sending VM: Read snapshot and write to qemu file*/

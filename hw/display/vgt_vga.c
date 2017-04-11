@@ -23,7 +23,8 @@
 #include "hw/xen/xen.h"
 #include "exec/ram_addr.h"
 
-#define DEBUG_VGT
+
+//#define DEBUG_VGT
 
 #ifdef DEBUG_VGT
 #define DPRINTF(fmt, ...) \
@@ -1050,6 +1051,8 @@ static void vgt_sync_dirty_bitmap(VGTVGAState *d, uint8_t *ram_bitmap,
     return;
 }
 
+extern bool ram_bulk_stage;
+
 /*
  * Qemu callback function whenever log dirty required
  */
@@ -1058,8 +1061,11 @@ static void vgt_log_sync(MemoryListener *listener,
 {
     VGTVGAState *d = container_of(listener, 
             struct VGTVGAState, vgt_memory_listener);
+    //static bool sync_ram_bulk = true;
 
-    if (d->vgt_paused) {
+    if (d->vgt_paused || (ram_bulk_stage)) {
+    //    sync_ram_bulk = false;
+//        printf("jachin: vgt dirty log sync\n");
         hwaddr start_addr = section->offset_within_address_space;
         ram_addr_t size = int128_get64(section->size);
         unsigned long nr_pages = size >> TARGET_PAGE_BITS;	
@@ -1078,7 +1084,7 @@ static void vgt_log_sync(MemoryListener *listener,
                 start_addr,
                 nr_pages);
 
-        cpu_physical_memory_set_dirty_lebitmap(bitmap, start_addr, nr_pages);
+        gpu_physical_memory_set_dirty_lebitmap(bitmap, start_addr, nr_pages);
 
         g_free(bitmap);
     }

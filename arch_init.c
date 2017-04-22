@@ -618,7 +618,8 @@ static void vgpu_bitmap_sync_range(ram_addr_t start, ram_addr_t length)
                 vgpu_bitmap[k] |= src[k];
                 new_dirty &= src[k];
                 vgpu_dirty_pages += ctpopl(new_dirty);
-                src[k] = 0;
+                /* we shouldn't set the gpu dirty bitmap zero */
+                // src[k] = 0;
             }
         }
     } else {
@@ -626,9 +627,9 @@ static void vgpu_bitmap_sync_range(ram_addr_t start, ram_addr_t length)
             if (cpu_physical_memory_get_dirty(start + addr,
                                               TARGET_PAGE_SIZE,
                                               DIRTY_MEMORY_VGPU)) {
-                cpu_physical_memory_reset_dirty(start + addr,
-                                                TARGET_PAGE_SIZE,
-                                                DIRTY_MEMORY_VGPU);
+                // cpu_physical_memory_reset_dirty(start + addr,
+                //                                TARGET_PAGE_SIZE,
+                //                                DIRTY_MEMORY_VGPU);
                 vgpu_bitmap_set_dirty(start + addr);
             }
         }

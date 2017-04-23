@@ -22,6 +22,7 @@
 #include "sysemu/arch_init.h"
 #include "hw/xen/xen.h"
 #include "exec/ram_addr.h"
+#include "trace.h"
 
 
 //#define DEBUG_VGT

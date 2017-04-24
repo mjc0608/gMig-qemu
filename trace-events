@@ -1598,10 +1598,10 @@ gpu_bitmap_sync_begin(uint64_t time) "gpu bitmap sync begin at %"PRIx64
 gpu_bitmap_sync_end(uint64_t time) "gpu bitmap sync end at %"PRIx64
 remove_cpu_dirty_from_gpu_begin(uint64_t time) "clean gpu dirty bitmap begin at %"PRIx64
 remove_cpu_dirty_from_gpu_end(uint64_t time) "clean gpu dirty bitmap end at %"PRIx64
-ram_save_pending(uint32_t sync, int remain_pages) "ram_save_pending: sync=%d"
+ram_save_pending(uint32_t sync, uint64_t remain_pages) "ram_save_pending: sync=%d, remain=%ld"
 ram_save_complete_begin(uint64_t time) "begin ram_save_complete at %"PRIx64
 ram_save_complete_end(uint64_t time) "end ram_save_complete at %"PRIx64
 exit_bulk_stage(uint64_t time) "exit bulk_stage at %"PRIx64
 enter_round(int round) "enter round: %d"
-pending_pages_count(int old, int new) "before sync: %d, after sync: %d"
+pending_pages_count(uint64_t old, uint64_t new) "before sync: %d, after sync: %d"
 

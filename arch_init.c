@@ -1377,7 +1377,7 @@ static uint64_t ram_save_pending(QEMUFile *f, void *opaque, uint64_t max_size)
 
     bool if_sync = remaining_size < max_size;
     uint64_t old_remaining_size = remaining_size;
-    trace_ram_save_pending(if_sync, remaining_size);
+    trace_ram_save_pending(if_sync, remaining_size/TARGET_PAGE_SIZE);
 
     if (remaining_size < max_size) {
         qemu_mutex_lock_iothread();
@@ -1387,7 +1387,7 @@ static uint64_t ram_save_pending(QEMUFile *f, void *opaque, uint64_t max_size)
         qemu_mutex_unlock_iothread();
         remaining_size = ram_save_remaining() * TARGET_PAGE_SIZE;
 
-        trace_pending_pages_count(old_remaining_size, remaining_size);
+        trace_pending_pages_count(old_remaining_size, remaining_size/TARGET_PAGE_SIZE);
     }
     return remaining_size;
 }

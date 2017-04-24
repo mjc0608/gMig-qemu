@@ -1602,4 +1602,5 @@ ram_save_pending(uint32_t sync) "ram_save_pending: sync=%d"
 ram_save_complete_begin(uint64_t time) "begin ram_save_complete at %"PRIx64
 ram_save_complete_end(uint64_t time) "end ram_save_complete at %"PRIx64
 exit_bulk_stage(uint64_t time) "exit bulk_stage at %"PRIx64
+enter_round(int round) "enter round: %d"
 

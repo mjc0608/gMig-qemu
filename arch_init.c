@@ -328,7 +328,7 @@ static ram_addr_t last_gm_offset;
 static bool vgpu_sync;
 
 /* support for analysis */
-
+static int round_count = 1;
 
 /* time function */
 static inline uint64_t rdtsc(void) {
@@ -993,6 +993,8 @@ static int ram_gm_find_and_save_block(QEMUFile *f, bool last_stage,
                 block = QLIST_FIRST_RCU(&ram_list.blocks);
                 complete_round = true;
                 ram_bulk_stage = false;
+                round_count++;
+                trace_enter_round(round_count);
             }
         } else {
             if (ram_offset < block->used_length)
@@ -1051,6 +1053,7 @@ static int ram_find_and_save_block(QEMUFile *f, bool last_stage,
                 block = QLIST_FIRST_RCU(&ram_list.blocks);
                 complete_round = true;
                 ram_bulk_stage = false;
+                round_count++;
             }
         } else {
             pages = ram_save_page(f, block, offset, last_stage,

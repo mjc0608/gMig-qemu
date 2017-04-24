@@ -1598,10 +1598,14 @@ gpu_bitmap_sync_begin(uint64_t time) "gpu bitmap sync begin at %"PRIx64
 gpu_bitmap_sync_end(uint64_t time) "gpu bitmap sync end at %"PRIx64
 remove_cpu_dirty_from_gpu_begin(uint64_t time) "clean gpu dirty bitmap begin at %"PRIx64
 remove_cpu_dirty_from_gpu_end(uint64_t time) "clean gpu dirty bitmap end at %"PRIx64
-ram_save_pending(uint32_t sync, uint64_t remain_pages) "ram_save_pending: sync=%d, remain=%ld"
+ram_save_pending(uint64_t time, uint32_t sync, uint64_t remain_pages) "time: %llu, ram_save_pending: sync=%d, remain=%ld"
 ram_save_complete_begin(uint64_t time) "begin ram_save_complete at %"PRIx64
 ram_save_complete_end(uint64_t time) "end ram_save_complete at %"PRIx64
 exit_bulk_stage(uint64_t time) "exit bulk_stage at %"PRIx64
 enter_round(int round) "enter round: %d"
-pending_pages_count(uint64_t old, uint64_t new) "before sync: %d, after sync: %d"
-
+pending_pages_count(uint64_t time, uint64_t old, uint64_t new) "time: %llu, before sync: %d, after sync: %d"
+round_pages(int round, int cpu_pages, int gpu_pages) "round: %d, cpu: %d, gpu: %d"
+complete_round_pages(int cpu_pages, int gpu_pages) "complete stage: cpu: %d, gpu: %d"
+hash_gpu_pages(int gpu_pages) "hash gpu pages: %d"
+hash_cpu_pages(int cpu_paegs) "hash cpu pages: %d"
+skip_by_hashing(int skipped) "skipped pages: %d"

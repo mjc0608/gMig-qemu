@@ -656,11 +656,13 @@ void XXH128 (const void* input, size_t len, unsigned long long seed, void* out)
 }
 
 
-FORCE_INLINE void XXH256_endian_align(const void* input, size_t len, U64 seed, XXH_endianess endian, XXH_alignment align, void* out)
+/* return 0 if not modified, return 1 if modified */
+FORCE_INLINE int XXH256_endian_align(const void* input, size_t len, U64 seed, XXH_endianess endian, XXH_alignment align, void* out)
 {
     const BYTE* p = (const BYTE*)input;
     const BYTE* bEnd = p + len;
     U64 h1, h2, h3, h4;
+    int ret;
 
 #define XXH_get64bits(p) XXH_readLE64_align((const U64*)p, endian, align)
 
@@ -797,15 +799,23 @@ FORCE_INLINE void XXH256_endian_align(const void* input, size_t len, U64 seed, X
     h2 *= PRIME64_3;
     h3 ^= h2 >> 32;
 
+    ret = ((unsigned long long*)out)[0] != h1
+        || ((unsigned long long*)out)[1] != h2
+        || ((unsigned long long*)out)[2] != h3
+        || ((unsigned long long*)out)[3] != h4;
+
     ((unsigned long long*)out)[0] = h1;
     ((unsigned long long*)out)[1] = h2;
     ((unsigned long long*)out)[2] = h3;
     ((unsigned long long*)out)[3] = h4;
 
+    return ret;
+
 #undef XXH_get64bits
 }
 
-void XXH256 (const void* input, size_t len, unsigned long long seed, void* out)
+/* return 0 if not modified, return 1 if modified */
+int XXH256 (const void* input, size_t len, unsigned long long seed, void* out)
 {
 #if 0
     XXH256_state_t state;
@@ -819,16 +829,16 @@ void XXH256 (const void* input, size_t len, unsigned long long seed, void* out)
     if ((((size_t)input) & 7)==0)   // Input is aligned, let's leverage the speed advantage
     {
         if ((endian_detected==XXH_littleEndian) || XXH_FORCE_NATIVE_FORMAT)
-            XXH256_endian_align(input, len, seed, XXH_littleEndian, XXH_aligned, out);
+            return XXH256_endian_align(input, len, seed, XXH_littleEndian, XXH_aligned, out);
         else
-            XXH256_endian_align(input, len, seed, XXH_bigEndian, XXH_aligned, out);
+            return XXH256_endian_align(input, len, seed, XXH_bigEndian, XXH_aligned, out);
     }
 #  endif
 
     if ((endian_detected==XXH_littleEndian) || XXH_FORCE_NATIVE_FORMAT)
-        XXH256_endian_align(input, len, seed, XXH_littleEndian, XXH_unaligned, out);
+        return XXH256_endian_align(input, len, seed, XXH_littleEndian, XXH_unaligned, out);
     else
-        XXH256_endian_align(input, len, seed, XXH_bigEndian, XXH_unaligned, out);
+        return XXH256_endian_align(input, len, seed, XXH_bigEndian, XXH_unaligned, out);
 #endif
 }
 

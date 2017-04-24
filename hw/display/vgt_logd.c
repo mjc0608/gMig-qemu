@@ -105,15 +105,8 @@ unsigned long* logd_alloc_dirty_bitmap(void) {
     return bitmap;
 }
 
-static uint8_t array256bit[32];
 static bool hash_of_page_256bit(void* va, void* target) {
-    memcpy(array256bit, target, 32);
-    XXH256(va, 4096, 0, target);
-    do {
-        uint64_t *ptr1 = (uint64_t*)array256bit, *ptr2 = target;
-        return ptr1[0]!=ptr2[0] || ptr1[1]!=ptr2[1] ||
-                ptr1[2]!=ptr2[2] || ptr1[3]!=ptr2[3];
-    } while(0);
+    return XXH256(va, 4096, 0, target);
 }
 
 static inline

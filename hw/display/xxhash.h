@@ -85,7 +85,7 @@ typedef enum { XXH_OK=0, XXH_ERROR } XXH_errorcode;
 unsigned int       XXH32 (const void* input, size_t length, unsigned seed);
 unsigned long long XXH64 (const void* input, size_t length, unsigned long long seed);
 void 			   XXH128 (const void* input, size_t length, unsigned long long seed, void* out);
-void 			   XXH256 (const void* input, size_t length, unsigned long long seed, void* out);
+int 			   XXH256 (const void* input, size_t length, unsigned long long seed, void* out);
 
 /*
 XXH32() :

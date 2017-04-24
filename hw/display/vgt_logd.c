@@ -1,6 +1,7 @@
 #include "vgt_logd.h"
 #include "qemu/bitmap.h"
 #include "qemu/bitops.h"
+#include "xxhash.h"
 
 #define DEBUG_MIG_VGT
 #ifdef DEBUG_MIG_VGT
@@ -104,7 +105,16 @@ unsigned long* logd_alloc_dirty_bitmap(void) {
     return bitmap;
 }
 
-extern bool hash_of_page_256bit(void* va, void* target);
+static uint8_t array256bit[32];
+static bool hash_of_page_256bit(void* va, void* target) {
+    memcpy(array256bit, target, 32);
+    XXH256(va, 4096, 0, target);
+    do {
+        uint64_t *ptr1 = (uint64_t*)array256bit, *ptr2 = target;
+        return ptr1[0]!=ptr2[0] || ptr1[1]!=ptr2[1] ||
+                ptr1[2]!=ptr2[2] || ptr1[3]!=ptr2[3];
+    } while(0);
+}
 
 static inline
 void logd_hash_a_page(vgt_logd_t *logd, void *va, unsigned long gfn) {
@@ -184,66 +194,4 @@ bool vgt_gpu_releated(unsigned long gfn) {
 
     return true;
 }
-
-/* defination of hash_of_page_256bit, this function use AVX-2 to
- * speed up hashing process, thus it is written in assmebly */
-__asm__ (
-	".text\n\t"
-	".p2align 4,,15\n\t"
-	".globl	hash_of_page_256bit\n\t"
-	".type	hash_of_page_256bit, @function\n\t"
-"hash_of_page_256bit:\n\t"
-	"vpxor	%xmm1, %xmm1, %xmm1\n\t"
-	"leaq	64(%rdi), %rdx\n\t"
-	"prefetcht1	(%rdi)\n\t"
-	"leaq	128(%rdi), %rax\n\t"
-	"vmovdqu	(%rsi), %ymm4\n\t"
-	"prefetcht1	192(%rdi)\n\t"
-	"prefetcht1	(%rdx)\n\t"
-	"leaq	4096(%rdi), %rcx\n\t"
-	"prefetcht1	(%rax)\n\t"
-	"vmovdqa	%ymm1, %ymm0\n\t"
-	"vmovdqa	%ymm1, %ymm2\n\t"
-	"vmovdqa	%ymm1, %ymm3\n\t"
-	"jmp	.VGTHASHL2\n\t"
-".VGTHASHL10:\n\t"
-	"leaq	64(%rax), %rdx\n\t"
-	"subq	$-128, %rax\n\t"
-".VGTHASHL2:\n\t"
-	"cmpq	%rcx, %rax\n\t"
-	"prefetcht1	256(%rdi)\n\t"
-	"prefetcht1	320(%rdi)\n\t"
-	"vpxor	(%rdi), %ymm3, %ymm3\n\t"
-	"vpxor	32(%rdi), %ymm2, %ymm2\n\t"
-	"vpxor	96(%rdi), %ymm1, %ymm1\n\t"
-	"movq	%rax, %rdi\n\t"
-	"vpxor	(%rdx), %ymm0, %ymm0\n\t"
-	"jne	.VGTHASHL10\n\t"
-	"vpxor	%ymm3, %ymm0, %ymm0\n\t"
-	"vpxor	%ymm2, %ymm0, %ymm0\n\t"
-	"vpxor	%ymm1, %ymm0, %ymm0\n\t"
-	"vpcmpeqq	%ymm4, %ymm0, %ymm1\n\t"
-	"vmovdqa	%xmm1, %xmm2\n\t"
-	"vpextrq	$1, %xmm1, %rdx\n\t"
-	"vmovq	%xmm2, %rcx\n\t"
-	"vextracti128	$0x1, %ymm1, %xmm1\n\t"
-	"testq	%rcx, %rcx\n\t"
-	"vmovq	%xmm1, %rdi\n\t"
-	"vpextrq	$1, %xmm1, %rax\n\t"
-	"je	.VGTHASHL3\n\t"
-	"testq	%rdx, %rdx\n\t"
-	"je	.VGTHASHL3\n\t"
-	"testq	%rdi, %rdi\n\t"
-	"je	.VGTHASHL3\n\t"
-	"testq	%rax, %rax\n\t"
-	"je	.VGTHASHL3\n\t"
-	"xorl	%eax, %eax\n\t"
-	"vzeroupper\n\t"
-	"ret\n\t"
-".VGTHASHL3:\n\t"
-	"movl	$1, %eax\n\t"
-	"vmovdqu	%ymm0, (%rsi)\n\t"
-	"vzeroupper\n\t"
-	"ret\n\t"
-);
 

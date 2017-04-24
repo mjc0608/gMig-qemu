@@ -188,7 +188,7 @@ if __name__ == '__main__':
                 if is_string(type):
                     fields.append('%s=%s' % (name, rec[i]))
                 else:
-                    fields.append('%s=0x%x' % (name, rec[i]))
+                    fields.append('%s=%d' % (name, rec[i]))
                 i += 1
             print ' '.join(fields)
 

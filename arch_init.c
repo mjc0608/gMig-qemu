@@ -118,6 +118,9 @@ static void check_guest_throttling(void);
 
 static uint64_t bitmap_sync_count;
 
+
+extern uint64_t migration_time_base_ns;
+
 /***********************************************************/
 /* ram save/restore */
 
@@ -658,11 +661,16 @@ static void remove_cpu_dirty_from_gpu(void)
 //    DPRINTF("before cleaning:\n");
 //    cpu_gpu_bitmap_dump();
 
+    trace_remove_cpu_dirty_from_gpu_begin(
+            qemu_clock_get_ns(QEMU_CLOCK_HOST)-migration_time_base_ns);
+
     for (i=0; i<bitmap_longs; i++) {
         vgpu_dirty_pages -= ctpopl(vgpu_bitmap[i]);
         vgpu_bitmap[i] &= (~migration_bitmap[i]);
         vgpu_dirty_pages += ctpopl(vgpu_bitmap[i]);
     }
+    trace_remove_cpu_dirty_from_gpu_begin(
+            qemu_clock_get_ns(QEMU_CLOCK_HOST)-migration_time_base_ns);
 
 //    DPRINTF("after cleanning:\n");
 //    cpu_gpu_bitmap_dump();
@@ -711,16 +719,30 @@ static void migration_bitmap_sync(void)
 
     rcu_read_lock();
     if (vgpu_sync) {
+        uint64_t t1 = qemu_clock_get_ns(QEMU_CLOCK_HOST);
+        trace_cpu_bitmap_sync_begin(t1 - migration_time_base_ns);
         QLIST_FOREACH_RCU(block, &ram_list.blocks, next) {
             migration_bitmap_sync_range(block->mr->ram_addr, block->used_length);
+        }
+        t1 = qemu_clock_get_ns(QEMU_CLOCK_HOST);
+        trace_cpu_bitmap_sync_end(t1-migration_time_base_ns);
+
+        trace_gpu_bitmap_sync_begin(t1-migration_time_base_ns);
+        QLIST_FOREACH_RCU(block, &ram_list.blocks, next) {
             vgpu_bitmap_sync_range(block->mr->ram_addr, block->used_length);
         }
+        t1 = qemu_clock_get_ns(QEMU_CLOCK_HOST);
+        trace_gpu_bitmap_sync_end(t1-migration_time_base_ns);
         vgpu_sync = false;
     }
     else {
+        uint64_t t1 = qemu_clock_get_ns(QEMU_CLOCK_HOST);
+        trace_cpu_bitmap_sync_begin(t1 - migration_time_base_ns);
         QLIST_FOREACH_RCU(block, &ram_list.blocks, next) {
             migration_bitmap_sync_range(block->mr->ram_addr, block->used_length);
         }
+        t1 = qemu_clock_get_ns(QEMU_CLOCK_HOST);
+        trace_cpu_bitmap_sync_end(t1-migration_time_base_ns);
     }
     rcu_read_unlock();
 
@@ -963,7 +985,10 @@ static int ram_gm_find_and_save_block(QEMUFile *f, bool last_stage,
             gm_offset = 0;
             block = QLIST_NEXT_RCU(block, next);
             if (!block) {
-                //if (ram_bulk_stage) printf("exit bulk_stage\n");
+                if (ram_bulk_stage) {
+                    trace_exit_bulk_stage(
+                         qemu_clock_get_ns(QEMU_CLOCK_HOST)-migration_time_base_ns);
+                }
 
                 block = QLIST_FIRST_RCU(&ram_list.blocks);
                 complete_round = true;
@@ -1306,6 +1331,8 @@ static int ram_save_complete(QEMUFile *f, void *opaque)
     rcu_read_lock();
 
     //printf("enter ram_save_complete, bulk: %d\n", ram_bulk_stage);
+    trace_ram_save_complete_begin(
+            qemu_clock_get_ns(QEMU_CLOCK_HOST)-migration_time_base_ns);
     vgpu_sync = true;
     migration_bitmap_sync();
     remove_cpu_dirty_from_gpu();
@@ -1334,15 +1361,18 @@ static int ram_save_complete(QEMUFile *f, void *opaque)
 
 //    DPRINTF("ram_save_complete: pages: %d", total_pages);
 
+    trace_ram_save_complete_end(
+            qemu_clock_get_ns(QEMU_CLOCK_HOST)-migration_time_base_ns);
     return 0;
 }
 
 static uint64_t ram_save_pending(QEMUFile *f, void *opaque, uint64_t max_size)
 {
     uint64_t remaining_size;
-
     remaining_size = ram_save_remaining() * TARGET_PAGE_SIZE;
 //    DPRINTF("ram_save_pending, cpu remain: %lu, gpu remain: %lu, max: %lu\n", migration_dirty_pages, vgpu_dirty_pages, max_size>>12);
+
+    trace_ram_save_pending(remaining_size < max_size);
 
     if (remaining_size < max_size) {
         qemu_mutex_lock_iothread();

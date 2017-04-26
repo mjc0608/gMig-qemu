@@ -23,6 +23,7 @@
 #include "hw/xen/xen.h"
 #include "exec/ram_addr.h"
 #include "trace.h"
+#include "migration/migration.h"
 
 
 //#define DEBUG_VGT
@@ -1053,6 +1054,7 @@ static void vgt_sync_dirty_bitmap(VGTVGAState *d, uint8_t *ram_bitmap,
 }
 
 extern bool ram_bulk_stage;
+extern enum MigrationRoundState mig_round_state;
 
 /*
  * Qemu callback function whenever log dirty required
@@ -1064,7 +1066,9 @@ static void vgt_log_sync(MemoryListener *listener,
             struct VGTVGAState, vgt_memory_listener);
     //static bool sync_ram_bulk = true;
 
-    if (d->vgt_paused || (ram_bulk_stage)) {
+    if (d->vgt_paused
+        || mig_round_state==GPU_COPY_ROUND
+        || mig_round_state==STOP_AND_COPY_ROUND) {
     //    sync_ram_bulk = false;
 //        printf("jachin: vgt dirty log sync\n");
         hwaddr start_addr = section->offset_within_address_space;

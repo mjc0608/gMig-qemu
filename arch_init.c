@@ -120,6 +120,7 @@ static uint64_t bitmap_sync_count;
 
 
 extern uint64_t migration_time_base_ns;
+extern enum MigrationRoundState mig_round_state;
 
 /***********************************************************/
 /* ram save/restore */
@@ -728,7 +729,8 @@ static void migration_bitmap_sync(void)
     address_space_sync_dirty_bitmap(&address_space_memory);
 
     rcu_read_lock();
-    if (vgpu_sync) {
+    if (vgpu_sync
+        && (mig_round_state==GPU_COPY_ROUND || mig_round_state==STOP_AND_COPY_ROUND)) {
         trace_cpu_bitmap_sync_begin(get_mig_time());
         QLIST_FOREACH_RCU(block, &ram_list.blocks, next) {
             migration_bitmap_sync_range(block->mr->ram_addr, block->used_length);
@@ -913,14 +915,14 @@ static int gm_save_page(QEMUFile *f, RAMBlock* block, ram_addr_t offset,
         p = pp;
     }
 
-    if (!last_stage && ram_bulk_stage) {
+    if (!last_stage && mig_round_state==GPU_COPY_ROUND) {
         /* if it's not the last stage, then it has to be the first cycle,
          * and we have to caculate the hash value of it
          */
         vgt_hash_a_page(p, current_addr >> TARGET_PAGE_BITS);
         hash_gpu_pages_count++;
     }
-    else if (!ram_bulk_stage && !last_stage) {
+    else if (mig_round_state!=GPU_COPY_ROUND && !last_stage) {
         //printf("gm_save_page, not bulk or last!!!\n");
         return 0;
     }
@@ -1002,6 +1004,7 @@ static int ram_gm_find_and_save_block(QEMUFile *f, bool last_stage,
                 block = QLIST_FIRST_RCU(&ram_list.blocks);
                 complete_round = true;
                 ram_bulk_stage = false;
+                mig_round_state = STOP_AND_COPY_ROUND;
 
                 trace_round_pages(round_count, curr_round_sent_cpu, curr_round_sent_gpu);
                 round_count++;
@@ -1202,7 +1205,6 @@ static void reset_ram_globals(void)
  * start to become numerous it will be necessary to reduce the
  * granularity of these critical sections.
  */
-
 static int ram_save_setup(QEMUFile *f, void *opaque)
 {
     RAMBlock *block;
@@ -1309,7 +1311,7 @@ static int ram_save_iterate(QEMUFile *f, void *opaque)
     while ((ret = qemu_file_rate_limit(f)) == 0) {
         int pages;
 
-        if (ram_bulk_stage)
+        if (mig_round_state == GPU_COPY_ROUND)
             pages = ram_gm_find_and_save_block(f, false, &bytes_transferred);
         else
             pages = ram_find_and_save_block(f, false, &bytes_transferred);

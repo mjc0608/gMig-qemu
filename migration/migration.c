@@ -608,6 +608,7 @@ int64_t migrate_xbzrle_cache_size(void)
 /* migration thread support */
 uint64_t migration_time_base_ns;
 extern bool ram_bulk_stage;
+enum MigrationRoundState mig_round_state;
 static void *migration_thread(void *opaque)
 {
     migration_time_base_ns = qemu_clock_get_ns(QEMU_CLOCK_HOST);
@@ -619,6 +620,7 @@ static void *migration_thread(void *opaque)
     int64_t max_size = 0;
     int64_t start_time = initial_time;
     bool old_vm_running = false;
+    mig_round_state = PRE_COPY_ROUND;
 
     qemu_savevm_state_begin(s->file, &s->params);
 
@@ -632,8 +634,12 @@ static void *migration_thread(void *opaque)
         if (!qemu_file_rate_limit(s->file)) {
             pending_size = qemu_savevm_state_pending(s->file, max_size);
             trace_migrate_pending(pending_size, max_size);
-            if ((pending_size && pending_size >= max_size) || ram_bulk_stage) {
+            if ((pending_size && pending_size >= max_size) || ram_bulk_stage
+                    || mig_round_state==GPU_COPY_ROUND) {
                 qemu_savevm_state_iterate(s->file);
+            } else if (mig_round_state == PRE_COPY_ROUND) {
+                printf("enter GPU_COPY_ROUND\n");
+                mig_round_state = GPU_COPY_ROUND;
             } else {
                 int ret;
 

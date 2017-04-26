@@ -148,7 +148,7 @@ bool logd_page_rehash_and_test(vgt_logd_t *logd, void *va, unsigned long gfn) {
     if (SLOT_OFFSET(gfn) > logd->max_slot) return true;
 
     logd_slot_t *slot = GET_SLOT(logd, gfn);
-    assert(slot);
+    if (slot == NULL) return false;
 
     if (slot->logd_tag_block == NULL) return true;
     if (slot->logd_dirty_bitmap == NULL) return true;

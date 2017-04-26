@@ -35,6 +35,12 @@
 #define QEMU_VM_SUBSECTION           0x05
 #define QEMU_VM_VMDESCRIPTION        0x06
 
+enum MigrationRoundState {
+    PRE_COPY_ROUND,
+    GPU_COPY_ROUND,
+    STOP_AND_COPY_ROUND
+};
+
 struct MigrationParams {
     bool blk;
     bool shared;

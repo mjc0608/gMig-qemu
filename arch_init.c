@@ -1040,6 +1040,68 @@ static int ram_gm_find_and_save_block(QEMUFile *f, bool last_stage,
 
     return pages;
 }
+
+static int gm_find_and_trace_block(void)
+{
+    RAMBlock *block = last_seen_block;
+    ram_addr_t gm_offset = last_gm_offset;
+    bool complete_round = false;
+    int pages = 0, gm_pages = 0, ram_pages = 0;
+    MemoryRegion *mr;
+
+    if (!block)
+        block = QLIST_FIRST_RCU(&ram_list.blocks);
+
+    while (true) {
+        mr = block->mr;
+        if (gm_offset < block->used_length)
+            gm_offset = vgpu_bitmap_find_and_reset_dirty(mr, gm_offset);
+
+        if (complete_round && block == last_seen_block &&
+            gm_offset >= last_gm_offset) {
+            break;
+        }
+        if (ram_offset >= block->used_length && gm_offset >= block->used_length) {
+            //printf("ram_offset: %lu, gm_offset: %lu, max_offset: %lu\n", ram_offset, gm_offset, block->used_length);
+            gm_offset = 0;
+            block = QLIST_NEXT_RCU(block, next);
+            if (!block) {
+                if (ram_bulk_stage) {
+                    trace_exit_bulk_stage(get_mig_time());
+                }
+
+                block = QLIST_FIRST_RCU(&ram_list.blocks);
+                complete_round = true;
+                ram_bulk_stage = false;
+
+                trace_round_pages(round_count, curr_round_sent_cpu, curr_round_sent_gpu);
+                round_count++;
+                trace_enter_round(round_count);
+                curr_round_sent_gpu = 0;
+            }
+        } else {
+            if (gm_offset < block->used_length)
+                gm_pages = gm_save_page(f, block, gm_offset, last_stage,
+                                  bytes_transferred);
+            pages += (gm_pages);
+            curr_round_sent_gpu += gm_pages;
+
+            /* if page is unmodified, continue to the next */
+            if (pages > 0) {
+                last_sent_block = block;
+                break;
+            }
+        }
+    }
+
+    last_seen_block = block;
+    last_offset = ram_offset;
+    last_gm_offset = gm_offset;
+
+
+    return pages;
+}
+
 #endif
 
 #if 1
@@ -1415,7 +1477,7 @@ static uint64_t ram_save_pending(QEMUFile *f, void *opaque, uint64_t max_size)
     uint64_t old_remaining_size = remaining_size;
     trace_ram_save_pending(get_mig_time(), if_sync, remaining_size/TARGET_PAGE_SIZE);
 
-    if (remaining_size < max_size) {
+    if (remaining_size == 0) {
         qemu_mutex_lock_iothread();
         rcu_read_lock();
         migration_bitmap_sync();

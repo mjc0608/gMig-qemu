@@ -1384,6 +1384,13 @@ static void hmp_migrate_status_cb(void *opaque)
     qapi_free_MigrationInfo(info);
 }
 
+void hmp_trace_gpu_working_set(Monitor *mon, const QDict *qdict)
+{
+    printf("hello\n");
+}
+
+
+
 void hmp_migrate(Monitor *mon, const QDict *qdict)
 {
     int detach = qdict_get_try_bool(qdict, "detach", 0);

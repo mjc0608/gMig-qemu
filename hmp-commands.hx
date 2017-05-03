@@ -57,6 +57,20 @@ Quit the emulator.
 ETEXI
 
     {
+        .name       = "gtrace",
+        .args_type  = "",
+        .params     = "",
+        .help       = "trace gpu working set",
+        .mhandler.cmd = hmp_trace_gpu_working_set,
+    },
+
+STEXI
+@item gtrace
+@findex gtrace
+trace gpu working set.
+ETEXI
+
+    {
         .name       = "block_resize",
         .args_type  = "device:B,size:o",
         .params     = "device size",

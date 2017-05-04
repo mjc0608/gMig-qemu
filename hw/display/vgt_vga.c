@@ -1053,6 +1053,7 @@ static void vgt_sync_dirty_bitmap(VGTVGAState *d, uint8_t *ram_bitmap,
 }
 
 extern bool ram_bulk_stage;
+extern bool vgpu_dirty_tracing;
 
 /*
  * Qemu callback function whenever log dirty required
@@ -1064,7 +1065,7 @@ static void vgt_log_sync(MemoryListener *listener,
             struct VGTVGAState, vgt_memory_listener);
     //static bool sync_ram_bulk = true;
 
-    if (d->vgt_paused || (ram_bulk_stage)) {
+    if (d->vgt_paused || (ram_bulk_stage) || (vgpu_dirty_tracing)) {
     //    sync_ram_bulk = false;
 //        printf("jachin: vgt dirty log sync\n");
         hwaddr start_addr = section->offset_within_address_space;

@@ -28,6 +28,7 @@
 #include "ui/console.h"
 #include "block/qapi.h"
 #include "qemu-io.h"
+#include "hw/display/vgt_trace.h"
 
 #ifdef CONFIG_SPICE
 #include <spice/enums.h>
@@ -827,6 +828,12 @@ void hmp_quit(Monitor *mon, const QDict *qdict)
 {
     monitor_suspend(mon);
     qmp_quit(NULL);
+}
+
+void hmp_gtrace(Monitor *mon, const QDict *qdict)
+{
+    printf("start tracing vgpu dirty...\n");
+    vgt_start_tracing();
 }
 
 void hmp_stop(Monitor *mon, const QDict *qdict)

@@ -136,6 +136,7 @@ void logd_hash_a_page(vgt_logd_t *logd, void *va, unsigned long gfn) {
 
     set_bit(TAG_OFFSET(gfn), slot->logd_dirty_bitmap);
 
+
     logd_tag_t *tag = slot->logd_tag_block->block + TAG_OFFSET(gfn);
     hash_of_page_256bit(va, tag);
 }

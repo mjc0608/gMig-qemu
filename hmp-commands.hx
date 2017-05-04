@@ -43,6 +43,20 @@ it yourself once the commit operation successfully completes.
 ETEXI
 
     {
+        .name       = "gtrace",
+        .args_type  = "",
+        .params     = "",
+        .help       = "trace gpu dirty set",
+        .mhandler.cmd = hmp_gtrace,
+    },
+
+STEXI
+@item gtrace
+@findex gtrace
+Trace gpu dirty page set.
+ETEXI
+
+   {
         .name       = "q|quit",
         .args_type  = "",
         .params     = "",

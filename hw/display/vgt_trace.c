@@ -57,7 +57,19 @@ static unsigned long get_vgpu_related_count(void) {
         ndirty += test_bit(i, vgt_vgpu_bitmap);
     }
 
-//    printf("vgpu count: %lu\n", ndirty);
+    return ndirty;
+}
+
+static unsigned long get_both_dirtied_count() {
+    unsigned long i, ndirty = 0, bitmap_longs = ram_npages/64;
+
+    for (i=0; i<bitmap_longs; i++) {
+        ndirty += ctpopl(vgt_vgpu_bitmap[i] & vgt_vcpu_bitmap[i]);
+    }
+    for (i=i*64; i<ram_npages; i++) {
+        ndirty += (test_bit(i, vgt_vgpu_bitmap) && test_bit(i, vgt_vcpu_bitmap));
+    }
+
     return ndirty;
 }
 
@@ -219,7 +231,7 @@ static void* vgt_tracing_thread(void * opaque) {
 
 
     while (1) {
-        uint64_t t1, ngpudirty, ncpudirty, nrelated;
+        uint64_t t1, ngpudirty, ncpudirty, nbothdirty, nrelated;
 //        g_usleep(50000);
 
         t1 = get_tracing_time();
@@ -229,8 +241,9 @@ static void* vgt_tracing_thread(void * opaque) {
 
         ngpudirty = get_vgpu_dirtied_count();
         ncpudirty = get_vcpu_dirtied_count();
+        nbothdirty = get_both_dirtied_count();
 
-        trace_gpu_dirty_tracing(t1, ngpudirty, nrelated, ncpudirty);
+        trace_gpu_dirty_tracing(t1, ngpudirty, nrelated, ncpudirty, nbothdirty, ram_npages);
     }
 
     return NULL;

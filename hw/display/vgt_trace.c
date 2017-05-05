@@ -168,17 +168,18 @@ static void* vgt_tracing_thread(void * opaque) {
 
 
     while (1) {
-        uint64_t t1, ndirty;
+        uint64_t t1, ndirty, nrelated;
 //        g_usleep(50000);
 
         t1 = get_tracing_time();
         vgpu_bitmap_sync();
+        nrelated = get_gpu_related_count();
 //        printf("gpu_related: %lu\n", get_gpu_related_count());
         gm_compare_iterate(false);
 
         ndirty = get_dirty_pages_count();
 
-        trace_gpu_dirty_tracing(t1, ndirty);
+        trace_gpu_dirty_tracing(t1, ndirty, nrelated);
     }
 
     return NULL;

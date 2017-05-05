@@ -1610,4 +1610,4 @@ hash_gpu_pages(int gpu_pages) "hash gpu pages: %d"
 hash_cpu_pages(int cpu_paegs) "hash cpu pages: %d"
 skip_by_hashing(int skipped) "skipped pages: %d"
 
-gpu_dirty_tracing(uint64_t time, uint64_t ndirty) "%llu: %llu"
+gpu_dirty_tracing(uint64_t time, uint64_t ndirty, uint64_t nrelated) "%llu: %llu"

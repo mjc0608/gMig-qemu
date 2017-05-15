@@ -9,10 +9,12 @@ static unsigned long *vgt_dirty_bitmap;
 static unsigned long *vgt_vgpu_bitmap;
 static unsigned long *vgt_vcpu_bitmap;
 static unsigned long ram_npages;
+static unsigned long ngpunew;
 bool vgpu_dirty_tracing;
 
 static void init_vgpu_tracing(void) {
     ram_npages = last_ram_offset() >> TARGET_PAGE_BITS;
+    ngpunew = 0;
     vgt_dirty_bitmap = bitmap_new(ram_npages);
     vgt_vgpu_bitmap = bitmap_new(ram_npages);
     vgt_vcpu_bitmap = bitmap_new(ram_npages);
@@ -60,14 +62,14 @@ static unsigned long get_vgpu_related_count(void) {
     return ndirty;
 }
 
-static unsigned long get_both_dirtied_count() {
+static unsigned long get_both_dirtied_count(void) {
     unsigned long i, ndirty = 0, bitmap_longs = ram_npages/64;
 
     for (i=0; i<bitmap_longs; i++) {
-        ndirty += ctpopl(vgt_vgpu_bitmap[i] & vgt_vcpu_bitmap[i]);
+        ndirty += ctpopl(vgt_dirty_bitmap[i] & vgt_vcpu_bitmap[i]);
     }
     for (i=i*64; i<ram_npages; i++) {
-        ndirty += (test_bit(i, vgt_vgpu_bitmap) && test_bit(i, vgt_vcpu_bitmap));
+        ndirty += (test_bit(i, vgt_dirty_bitmap) && test_bit(i, vgt_vcpu_bitmap));
     }
 
     return ndirty;
@@ -85,10 +87,14 @@ static inline void vcpu_bitmap_set_dirty(ram_addr_t addr)
     set_bit(nr, vgt_vcpu_bitmap);
 }
 
+static inline void vcpu_bitmap_clear_dirty(ram_addr_t addr)
+{
+    int nr = addr >> TARGET_PAGE_BITS;
+    clear_bit(nr, vgt_vcpu_bitmap);
+}
+
 static void vcpu_bitmap_sync_range(ram_addr_t start, ram_addr_t length)
 {
-    address_space_sync_dirty_bitmap(&address_space_memory);
-
     ram_addr_t addr;
     unsigned long page = BIT_WORD(start >> TARGET_PAGE_BITS);
 
@@ -101,6 +107,7 @@ static void vcpu_bitmap_sync_range(ram_addr_t start, ram_addr_t length)
         for (k = page; k < page + nr; k++) {
             if (src[k]) {
                 vgt_vcpu_bitmap[k] |= src[k];
+                src[k] = 0;
             }
         }
     } else {
@@ -108,16 +115,48 @@ static void vcpu_bitmap_sync_range(ram_addr_t start, ram_addr_t length)
             if (cpu_physical_memory_get_dirty(start + addr,
                                               TARGET_PAGE_SIZE,
                                               DIRTY_MEMORY_MIGRATION)) {
+                cpu_physical_memory_reset_dirty(start + addr,
+                                                TARGET_PAGE_SIZE,
+                                                DIRTY_MEMORY_MIGRATION);
                 vcpu_bitmap_set_dirty(start + addr);
             }
         }
     }
 }
 
+#if 1
+static void vcpu_bitmap_clear_range(ram_addr_t start, ram_addr_t length)
+{
+    ram_addr_t addr;
+    unsigned long page = BIT_WORD(start >> TARGET_PAGE_BITS);
+
+    /* start address is aligned at the start of a word? */
+    if (((page * BITS_PER_LONG) << TARGET_PAGE_BITS) == start) {
+        int k;
+        int nr = BITS_TO_LONGS(length >> TARGET_PAGE_BITS);
+        unsigned long *src = ram_list.dirty_memory[DIRTY_MEMORY_MIGRATION];
+
+        for (k = page; k < page + nr; k++) {
+            vgt_vcpu_bitmap[k] = 0;
+            src[k] = 0;
+        }
+    } else {
+        for (addr = 0; addr < length; addr += TARGET_PAGE_SIZE) {
+            if (cpu_physical_memory_get_dirty(start + addr,
+                                              TARGET_PAGE_SIZE,
+                                              DIRTY_MEMORY_MIGRATION)) {
+                cpu_physical_memory_reset_dirty(start + addr,
+                                                TARGET_PAGE_SIZE,
+                                                DIRTY_MEMORY_MIGRATION);
+                vcpu_bitmap_clear_dirty(start + addr);
+            }
+        }
+    }
+}
+#endif
+
 static void vgpu_bitmap_sync_range(ram_addr_t start, ram_addr_t length)
 {
-    address_space_sync_dirty_bitmap(&address_space_memory);
-
     ram_addr_t addr;
     unsigned long page = BIT_WORD(start >> TARGET_PAGE_BITS);
 
@@ -164,6 +203,7 @@ ram_addr_t vgpu_bitmap_find_and_reset_dirty(MemoryRegion *mr,
 
 static void vgpu_bitmap_sync(void) {
     RAMBlock *block;
+    address_space_sync_dirty_bitmap(&address_space_memory);
     QLIST_FOREACH_RCU(block, &ram_list.blocks, next) {
         vgpu_bitmap_sync_range(block->mr->ram_addr, block->used_length);
         vcpu_bitmap_sync_range(block->mr->ram_addr, block->used_length);
@@ -191,7 +231,11 @@ static void gm_compare_page(RAMBlock *block, ram_addr_t offset, bool first_stage
     }
     else {
         if (test_bit(gfn, vgt_dirty_bitmap)) return;
-        if (vgt_page_is_modified(p, gfn)) {
+        else if (!vgt_gpu_releated(gfn)) {
+            ngpunew++;
+            vgt_hash_a_page(p, gfn);
+        }
+        else if (vgt_page_is_modified(p, gfn)) {
             set_bit(gfn, vgt_dirty_bitmap);
         }
     }
@@ -222,16 +266,25 @@ static inline uint64_t get_tracing_time(void) {
 }
 
 static void* vgt_tracing_thread(void * opaque) {
-    vgpu_dirty_tracing = true;
+    uint64_t t1, ngpudirty, ncpudirty, nbothdirty, nrelated;
+    RAMBlock *block;
+
     init_vgpu_tracing();
 
     vgpu_bitmap_sync();
-    gm_compare_iterate(true);
-    init_tracing_time();
+    QLIST_FOREACH_RCU(block, &ram_list.blocks, next) {
+        vcpu_bitmap_clear_range(block->mr->ram_addr, block->used_length);
+    }
 
+
+    init_tracing_time();
+    vgpu_dirty_tracing = true;
+
+    vgpu_bitmap_sync();
+
+    gm_compare_iterate(true);
 
     while (1) {
-        uint64_t t1, ngpudirty, ncpudirty, nbothdirty, nrelated;
 //        g_usleep(50000);
 
         t1 = get_tracing_time();
@@ -243,7 +296,7 @@ static void* vgt_tracing_thread(void * opaque) {
         ncpudirty = get_vcpu_dirtied_count();
         nbothdirty = get_both_dirtied_count();
 
-        trace_gpu_dirty_tracing(t1, ngpudirty, nrelated, ncpudirty, nbothdirty, ram_npages);
+        trace_gpu_dirty_tracing(t1, ngpudirty, nrelated, ncpudirty, nbothdirty, ram_npages, ngpunew);
     }
 
     return NULL;

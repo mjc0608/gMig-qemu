@@ -270,6 +270,7 @@ static void* vgt_tracing_thread(void * opaque) {
     RAMBlock *block;
 
     init_vgpu_tracing();
+    memory_global_dirty_log_start();
 
     vgpu_bitmap_sync();
     QLIST_FOREACH_RCU(block, &ram_list.blocks, next) {

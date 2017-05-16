@@ -895,8 +895,6 @@ static int ram_save_page(QEMUFile *f, RAMBlock* block, ram_addr_t offset,
     return pages;
 }
 
-static uint8_t pp[TARGET_PAGE_SIZE];
-
 static int gm_save_page(QEMUFile *f, RAMBlock* block, ram_addr_t offset,
                          bool last_stage, uint64_t *bytes_transferred)
 {
@@ -908,16 +906,11 @@ static int gm_save_page(QEMUFile *f, RAMBlock* block, ram_addr_t offset,
     p = memory_region_get_ram_ptr(mr) + offset;
     current_addr = block->offset + offset;
 
-    if (!last_stage) {
-        memcpy(pp, p, TARGET_PAGE_SIZE);
-        p = pp;
-    }
-
     if (!last_stage && ram_bulk_stage) {
         /* if it's not the last stage, then it has to be the first cycle,
          * and we have to caculate the hash value of it
          */
-        vgt_hash_a_page(p, current_addr >> TARGET_PAGE_BITS);
+        p = vgt_hash_a_page(p, current_addr >> TARGET_PAGE_BITS);
         hash_gpu_pages_count++;
     }
     else if (!ram_bulk_stage && !last_stage) {

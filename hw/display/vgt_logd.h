@@ -28,9 +28,8 @@
 #define LOGD_HASH_SIZE 32
 #define VGT_PAGE_SHIFT 12
 
-/* 256bit hash value */
 typedef struct logd_tag_t {
-    uint8_t data[LOGD_HASH_SIZE];
+    void* copy_address;
 } logd_tag_t;
 
 typedef struct logd_tag_block_t {
@@ -50,7 +49,7 @@ typedef struct vgt_logd_t {
 } vgt_logd_t;
 
 bool vgt_page_is_modified(void *va, unsigned long gfn);
-void vgt_hash_a_page(void *va, unsigned long gfn);
+void* vgt_hash_a_page(void *va, unsigned long gfn);
 bool vgt_gpu_releated(unsigned long gfn);
 
 #endif

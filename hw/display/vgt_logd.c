@@ -1,6 +1,7 @@
 #include "vgt_logd.h"
 #include "qemu/bitmap.h"
 #include "qemu/bitops.h"
+#include <inttypes.h>
 
 #define DEBUG_MIG_VGT
 #ifdef DEBUG_MIG_VGT
@@ -26,6 +27,8 @@ static vgt_logd_t vgt_logd = {
     .max_gpfn = 0,
     .max_slot = 0
 };
+
+static bool sha_for_page(char* pp, char* target);
 
 /* when the slot array is not large enough, we have to increase it */
 static inline
@@ -134,7 +137,7 @@ void logd_hash_a_page(vgt_logd_t *logd, void *va, unsigned long gfn) {
     set_bit(TAG_OFFSET(gfn), slot->logd_dirty_bitmap);
 
     logd_tag_t *tag = slot->logd_tag_block->block + TAG_OFFSET(gfn);
-    hash_of_page_256bit(va, tag);
+    sha_for_page(va, (char*)tag);
 }
 
 static inline
@@ -154,7 +157,7 @@ bool logd_page_rehash_and_test(vgt_logd_t *logd, void *va, unsigned long gfn) {
 
     logd_tag_t *tag = slot->logd_tag_block->block + TAG_OFFSET(gfn);
 
-    bool is_modified = hash_of_page_256bit(va, tag);
+    bool is_modified = sha_for_page(va, (char*)tag);
 
     return is_modified;
 }
@@ -185,65 +188,80 @@ bool vgt_gpu_releated(unsigned long gfn) {
     return true;
 }
 
-/* defination of hash_of_page_256bit, this function use AVX-2 to
- * speed up hashing process, thus it is written in assmebly */
-__asm__ (
-	".text\n\t"
-	".p2align 4,,15\n\t"
-	".globl	hash_of_page_256bit\n\t"
-	".type	hash_of_page_256bit, @function\n\t"
-"hash_of_page_256bit:\n\t"
-	"vpxor	%xmm1, %xmm1, %xmm1\n\t"
-	"leaq	64(%rdi), %rdx\n\t"
-	"prefetcht1	(%rdi)\n\t"
-	"leaq	128(%rdi), %rax\n\t"
-	"vmovdqu	(%rsi), %ymm4\n\t"
-	"prefetcht1	192(%rdi)\n\t"
-	"prefetcht1	(%rdx)\n\t"
-	"leaq	4096(%rdi), %rcx\n\t"
-	"prefetcht1	(%rax)\n\t"
-	"vmovdqa	%ymm1, %ymm0\n\t"
-	"vmovdqa	%ymm1, %ymm2\n\t"
-	"vmovdqa	%ymm1, %ymm3\n\t"
-	"jmp	.VGTHASHL2\n\t"
-".VGTHASHL10:\n\t"
-	"leaq	64(%rax), %rdx\n\t"
-	"subq	$-128, %rax\n\t"
-".VGTHASHL2:\n\t"
-	"cmpq	%rcx, %rax\n\t"
-	"prefetcht1	256(%rdi)\n\t"
-	"prefetcht1	320(%rdi)\n\t"
-	"vpxor	(%rdi), %ymm3, %ymm3\n\t"
-	"vpxor	32(%rdi), %ymm2, %ymm2\n\t"
-	"vpxor	96(%rdi), %ymm1, %ymm1\n\t"
-	"movq	%rax, %rdi\n\t"
-	"vpxor	(%rdx), %ymm0, %ymm0\n\t"
-	"jne	.VGTHASHL10\n\t"
-	"vpxor	%ymm3, %ymm0, %ymm0\n\t"
-	"vpxor	%ymm2, %ymm0, %ymm0\n\t"
-	"vpxor	%ymm1, %ymm0, %ymm0\n\t"
-	"vpcmpeqq	%ymm4, %ymm0, %ymm1\n\t"
-	"vmovdqa	%xmm1, %xmm2\n\t"
-	"vpextrq	$1, %xmm1, %rdx\n\t"
-	"vmovq	%xmm2, %rcx\n\t"
-	"vextracti128	$0x1, %ymm1, %xmm1\n\t"
-	"testq	%rcx, %rcx\n\t"
-	"vmovq	%xmm1, %rdi\n\t"
-	"vpextrq	$1, %xmm1, %rax\n\t"
-	"je	.VGTHASHL3\n\t"
-	"testq	%rdx, %rdx\n\t"
-	"je	.VGTHASHL3\n\t"
-	"testq	%rdi, %rdi\n\t"
-	"je	.VGTHASHL3\n\t"
-	"testq	%rax, %rax\n\t"
-	"je	.VGTHASHL3\n\t"
-	"xorl	%eax, %eax\n\t"
-	"vzeroupper\n\t"
-	"ret\n\t"
-".VGTHASHL3:\n\t"
-	"movl	$1, %eax\n\t"
-	"vmovdqu	%ymm0, (%rsi)\n\t"
-	"vzeroupper\n\t"
-	"ret\n\t"
-);
+static bool sha_for_page(char* pp, char* target) {
+    uint32_t h0 = 0x67452301;
+    uint32_t h1 = 0xEFCDAB89;
+    uint32_t h2 = 0x98BADCFE;
+    uint32_t h3 = 0x10325476;
+    uint32_t h4 = 0xC3D2E1F0;
+    int i, j, temp;
+    uint32_t a, b, c, d, e, f, k;
 
+    for (i=0; i<4096; i+=64) {
+        uint32_t *chunk = (uint32_t*)(pp+i);
+        uint32_t w[80];
+        for (j=0; j<16; j++) {
+            w[j] = chunk[j];
+        }
+        
+        for (j=16; j<=79; j++) {
+            temp = (w[j-3] ^ w[j-8] ^ w[j-14] ^ w[j-16]);
+            w[j] = ((temp<<1) | (temp>>31));
+        }
+
+        a = h0;
+        b = h1;
+        c = h2;
+        d = h3;
+        e = h4;
+
+        for (j=0; j<=79; j++) {
+            if (0<=j && j<=19) {
+                f = (b & c) | ((~b) & d);
+                k = 0x5A827999;
+            }
+            else if (20<=j && j<=39) {
+                f = b ^ c ^ d;
+                k = 0x6ED9EBA1;
+            }
+            else if (40<=j && j<=59) {
+                f = (b & c) | (b & d) | (c & d);
+                k = 0x8F1BBCDC;
+            }
+            else {
+                f = b ^ c ^ d;
+                k = 0xCA62C1D6;
+            }
+
+            temp = ((a<<5) | (a>>27)) + f + e + k + w[j];
+            e = d;
+            d = c;
+            c = (b<<30) | (b>>2);
+            b = a;
+            a = temp;
+        }
+        h0 = h0 + a;
+        h1 = h1 + b;
+        h2 = h2 + c;
+        h3 = h3 + d;
+        h4 = h4 + e;
+    }
+
+    bool ret = false;
+
+    if (*((uint32_t*)(target)) != h0) ret = true;
+    if (*((uint32_t*)(target+4)) != h1) ret = true;
+    if (*((uint32_t*)(target+8)) != h2) ret = true;
+    if (*((uint32_t*)(target+12)) != h3) ret = true;
+    if (*((uint32_t*)(target+16)) != h4) ret = true;
+
+    if (ret) return true;
+
+    *((uint32_t*)(target)) = h0;
+    *((uint32_t*)(target+4)) = h1;
+    *((uint32_t*)(target+8)) = h2;
+    *((uint32_t*)(target+12)) = h3;
+    *((uint32_t*)(target+16)) = h4;
+
+    return false;
+}

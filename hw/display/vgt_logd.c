@@ -2,6 +2,9 @@
 #include "qemu/bitmap.h"
 #include "qemu/bitops.h"
 #include "xxhash.h"
+#include "trace.h"
+#include "vgt_logd.h"
+#include "qemu/rcu_queue.h"
 
 #define DEBUG_MIG_VGT
 #ifdef DEBUG_MIG_VGT
@@ -110,7 +113,7 @@ static bool hash_of_page_256bit(void* va, void* target) {
 }
 
 static inline
-void logd_hash_a_page(vgt_logd_t *logd, void *va, unsigned long gfn) {
+bool logd_hash_a_page(vgt_logd_t *logd, void *va, unsigned long gfn) {
     assert(logd!=NULL);
     assert(va!=NULL);
 
@@ -137,7 +140,8 @@ void logd_hash_a_page(vgt_logd_t *logd, void *va, unsigned long gfn) {
     set_bit(TAG_OFFSET(gfn), slot->logd_dirty_bitmap);
 
     logd_tag_t *tag = slot->logd_tag_block->block + TAG_OFFSET(gfn);
-    hash_of_page_256bit(va, tag);
+    bool is_modified = hash_of_page_256bit(va, tag);
+    return is_modified;
 }
 
 static inline
@@ -188,3 +192,42 @@ bool vgt_gpu_releated(unsigned long gfn) {
     return true;
 }
 
+
+/*******************************************************************************/
+/* vgt_prehashing */
+
+static QemuThread vgt_prehashing_thread;
+static int max_sent_gpfn = 0;
+static long *logd_pre_dirty_bitmap;
+static unsigned long ram_npages;
+
+static void vgt_prehashing_init() {
+    ram_npages = last_ram_offset() >> TARGET_PAGE_BITS;
+    logd_pre_dirty_bitmap = bitmap_new(ram_npages);
+    bitmap_clear(logd_pre_dirty_bitmap, 0, ram_npages);
+}
+
+bool vgt_page_is_predirtied(gfn) {
+    return test_bit(gfn, logd_pre_dirty_bitmap);
+}
+
+static void
+vgt_prehashing_iterate(void) {
+    RAMBlock *block;
+
+    QLIST_FOREACH_RCU(block, &ram_list.blocks, next) {
+        ram_addr_t offset = 0;
+        MemoryRegion *mr = block->mr;
+    }
+}
+
+static void*
+vgt_prehashing_thread(void *opaque) {
+    RAMBlock *block;
+}
+
+void vgt_start_prehashing(void) {
+    max_sent_gpfn
+    qemu_thread_create(&vgt_prehashing_thread, "prehashing",
+            vgt_prehashing_thread, QEMU_THREAD_JOINABLE);
+}

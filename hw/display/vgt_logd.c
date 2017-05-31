@@ -31,6 +31,12 @@ static vgt_logd_t vgt_logd = {
     .max_slot = 0
 };
 
+static unsigned long *logd_dirty_bitmap;
+static unsigned long max_sent_gpfn = 0;
+static QemuThread vgt_prehashing_thread;
+static unsigned long *logd_pre_dirty_bitmap;
+static unsigned long ram_npages;
+
 /* when the slot array is not large enough, we have to increase it */
 static inline
 bool logd_increase_slot_count(vgt_logd_t *logd, unsigned long gfn) {
@@ -66,17 +72,15 @@ bool logd_increase_slot_count(vgt_logd_t *logd, unsigned long gfn) {
     return true;
 }
 
-#if 0
-static inline
-vgt_logd_t* vgt_logd_init(void) {
-    vgt_logd_t *logd = g_malloc0(sizeof(vgt_logd_t));
-    logd->slot_head = NULL;
-    logd->max_gpfn = 0;
-    logd->max_slot = 0;
+void vgt_logd_init(void) {
+    ram_npages = last_ram_offset() >> TARGET_PAGE_BITS;
+    logd_pre_dirty_bitmap = bitmap_new(ram_npages);
+    logd_dirty_bitmap = bitmap_new(ram_npages);
+    bitmap_clear(logd_pre_dirty_bitmap, 0, ram_npages);
+    bitmap_clear(logd_dirty_bitmap, 0, ram_npages);
 
-    return logd;
+    vgt_start_prehashing();
 }
-#endif
 
 static inline
 void vgt_logd_finit(vgt_logd_t *logd) {
@@ -84,10 +88,8 @@ void vgt_logd_finit(vgt_logd_t *logd) {
 
     for (i=0; i<logd->max_slot; i++) {
         logd_tag_block_t *tag_block = logd->slot_head[i].logd_tag_block;
-        unsigned long *slot_dirty_bitmap = logd->slot_head[i].logd_dirty_bitmap;
 
         if (tag_block != NULL) g_free(tag_block);
-        if (slot_dirty_bitmap != NULL) g_free(slot_dirty_bitmap);
     }
 
     g_free(logd->slot_head);
@@ -129,18 +131,12 @@ bool logd_hash_a_page(vgt_logd_t *logd, void *va, unsigned long gfn) {
         }
     }
 
-    if (slot->logd_dirty_bitmap == NULL) {
-        slot->logd_dirty_bitmap = logd_alloc_dirty_bitmap();
-        if (slot->logd_tag_block == NULL) {
-            DPRINTF("Failed to increase bitmap\n");
-        }
-        bitmap_clear(slot->logd_dirty_bitmap, 0, LOGD_SLOT_SIZE);
-    }
 
-    set_bit(TAG_OFFSET(gfn), slot->logd_dirty_bitmap);
+    if (gfn > max_sent_gpfn) max_sent_gpfn = gfn;
 
     logd_tag_t *tag = slot->logd_tag_block->block + TAG_OFFSET(gfn);
     bool is_modified = hash_of_page_256bit(va, tag);
+    set_bit(gfn, logd_dirty_bitmap);
     return is_modified;
 }
 
@@ -155,9 +151,8 @@ bool logd_page_rehash_and_test(vgt_logd_t *logd, void *va, unsigned long gfn) {
     assert(slot);
 
     if (slot->logd_tag_block == NULL) return true;
-    if (slot->logd_dirty_bitmap == NULL) return true;
 
-    if (test_bit(TAG_OFFSET(gfn), slot->logd_dirty_bitmap)==0) return true;
+    if (test_bit(gfn, logd_dirty_bitmap)==0) return true;
 
     logd_tag_t *tag = slot->logd_tag_block->block + TAG_OFFSET(gfn);
 
@@ -185,9 +180,8 @@ bool vgt_gpu_releated(unsigned long gfn) {
     if (slot == NULL) return false;
 
     if (slot->logd_tag_block == NULL) return false;
-    if (slot->logd_dirty_bitmap == NULL) return false;
 
-    if (test_bit(TAG_OFFSET(gfn), slot->logd_dirty_bitmap)==0) return false;
+    if (test_bit(gfn, logd_dirty_bitmap)==0) return false;
 
     return true;
 }
@@ -196,38 +190,81 @@ bool vgt_gpu_releated(unsigned long gfn) {
 /*******************************************************************************/
 /* vgt_prehashing */
 
-static QemuThread vgt_prehashing_thread;
-static int max_sent_gpfn = 0;
-static long *logd_pre_dirty_bitmap;
-static unsigned long ram_npages;
 
-static void vgt_prehashing_init() {
-    ram_npages = last_ram_offset() >> TARGET_PAGE_BITS;
-    logd_pre_dirty_bitmap = bitmap_new(ram_npages);
-    bitmap_clear(logd_pre_dirty_bitmap, 0, ram_npages);
-}
-
-bool vgt_page_is_predirtied(gfn) {
+bool vgt_page_is_predirtied(unsigned long gfn) {
     return test_bit(gfn, logd_pre_dirty_bitmap);
 }
 
+static inline
+void prehashing_exit(void)
+{
+    printf("spin on complete stage...\n");
+    while (1)
+        g_usleep(100000000);
+}
+
+static inline
+ram_addr_t vgpu_bitmap_find_dirty(MemoryRegion *mr,
+                                                 ram_addr_t start)
+{
+    unsigned long base = mr->ram_addr >> TARGET_PAGE_BITS;
+    unsigned long nr = base + (start >> TARGET_PAGE_BITS);
+    uint64_t mr_size = TARGET_PAGE_ALIGN(memory_region_size(mr));
+    unsigned long size = base + (mr_size >> TARGET_PAGE_BITS);
+
+    unsigned long next;
+
+    next = find_next_bit(logd_dirty_bitmap, size, nr);
+
+    return (next - base) << TARGET_PAGE_BITS;
+}
+
+extern bool is_complete_stage;
 static void
 vgt_prehashing_iterate(void) {
     RAMBlock *block;
 
     QLIST_FOREACH_RCU(block, &ram_list.blocks, next) {
         ram_addr_t offset = 0;
+        ram_addr_t curr_addr;
         MemoryRegion *mr = block->mr;
+        bool is_modified;
+        uint8_t *p;
+        uint64_t gfn;
+
+        while (1) {
+            offset = vgpu_bitmap_find_dirty(mr, offset);
+            if (offset >= block->used_length) break;
+            curr_addr = block->offset + offset;
+            gfn = curr_addr >> VGT_PAGE_SHIFT;
+
+            while (gfn >= max_sent_gpfn) {
+                g_usleep(50000);
+            }
+            if (is_complete_stage) prehashing_exit();
+
+            p = memory_region_get_ram_ptr(mr) + offset;
+
+            is_modified = logd_hash_a_page(&vgt_logd, p, gfn);
+
+            if (is_modified) {
+                set_bit(gfn, logd_pre_dirty_bitmap);
+            }
+            offset+=4096;
+        }
     }
 }
 
 static void*
-vgt_prehashing_thread(void *opaque) {
-    RAMBlock *block;
+do_vgt_prehashing_thread(void *opaque) {
+    while (1) {
+        g_usleep(50000);
+        vgt_prehashing_iterate();
+    }
+    return NULL;
 }
 
 void vgt_start_prehashing(void) {
-    max_sent_gpfn
     qemu_thread_create(&vgt_prehashing_thread, "prehashing",
-            vgt_prehashing_thread, QEMU_THREAD_JOINABLE);
+            do_vgt_prehashing_thread, NULL, QEMU_THREAD_JOINABLE);
 }

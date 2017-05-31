@@ -39,7 +39,6 @@ typedef struct logd_tag_block_t {
 
 typedef struct logd_slot_t {
     logd_tag_block_t *logd_tag_block;
-    unsigned long *logd_dirty_bitmap;
 } logd_slot_t;
 
 /* simple array instead of list for quick slot search */
@@ -53,6 +52,7 @@ bool vgt_page_is_modified(void *va, unsigned long gfn);
 void vgt_hash_a_page(void *va, unsigned long gfn);
 bool vgt_gpu_releated(unsigned long gfn);
 bool vgt_page_is_predirtied(unsigned long gfn);
-bool vgt_start_prehashing(void);
+void vgt_start_prehashing(void);
+void vgt_logd_init(void);
 
 #endif

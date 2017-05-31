@@ -117,6 +117,7 @@ static int dirty_rate_high_cnt;
 static void check_guest_throttling(void);
 
 static uint64_t bitmap_sync_count;
+static uint64_t prehashing_hit_count = 0;
 
 
 extern uint64_t migration_time_base_ns;
@@ -335,7 +336,7 @@ static bool vgpu_sync;
 static int round_count = 1;
 static int curr_round_sent_cpu = 0;
 static int curr_round_sent_gpu = 0;
-static bool is_complete_stage = false;
+bool is_complete_stage = false;
 static int complete_stage_sent_cpu = 0;
 static int complete_stage_sent_gpu = 0;
 static int skip_by_hashing = 0;
@@ -896,7 +897,6 @@ static int ram_save_page(QEMUFile *f, RAMBlock* block, ram_addr_t offset,
 }
 
 static uint8_t pp[TARGET_PAGE_SIZE];
-
 static int gm_save_page(QEMUFile *f, RAMBlock* block, ram_addr_t offset,
                          bool last_stage, uint64_t *bytes_transferred)
 {
@@ -928,12 +928,21 @@ static int gm_save_page(QEMUFile *f, RAMBlock* block, ram_addr_t offset,
         /* if it's the last stage, we calculate the hash value, if it is
          * not dirty, we skip it
          */
+
+        if (vgt_page_is_predirtied(current_addr >> TARGET_PAGE_BITS)) {
+            //printf("a\n");
+            prehashing_hit_count++;
+            goto send_page_begin;
+        }
+
         hash_gpu_pages_count++;
         if (!vgt_page_is_modified(p, current_addr >> TARGET_PAGE_BITS)) {
             skip_by_hashing++;
             return 0;
         }
     }
+
+send_page_begin:
 
     if (block == last_sent_block) {
         offset |= RAM_SAVE_FLAG_CONTINUE;
@@ -1210,6 +1219,8 @@ static int ram_save_setup(QEMUFile *f, void *opaque)
 
 //    DPRINTF("enter ram_save_setup\n");
 
+    vgt_logd_init();
+
     mig_throttle_on = false;
     dirty_rate_high_cnt = 0;
     bitmap_sync_count = 0;
@@ -1402,6 +1413,8 @@ static int ram_save_complete(QEMUFile *f, void *opaque)
     trace_hash_cpu_pages(hash_cpu_pages_count);
     trace_hash_gpu_pages(hash_gpu_pages_count);
     trace_skip_by_hashing(skip_by_hashing);
+
+    //printf("prehashing_hit_count: %ld\n", prehashing_hit_count);
     return 0;
 }
 

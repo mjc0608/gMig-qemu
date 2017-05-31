@@ -195,10 +195,14 @@ bool vgt_page_is_predirtied(unsigned long gfn) {
     return test_bit(gfn, logd_pre_dirty_bitmap);
 }
 
+void* vgt_get_prehashing_dirty_bitmap(void) {
+    return logd_pre_dirty_bitmap;
+}
+
 static inline
 void prehashing_exit(void)
 {
-    printf("spin on complete stage...\n");
+//    printf("spin on complete stage...\n");
     while (1)
         g_usleep(100000000);
 }
@@ -237,8 +241,11 @@ vgt_prehashing_iterate(void) {
             if (offset >= block->used_length) break;
             curr_addr = block->offset + offset;
             gfn = curr_addr >> VGT_PAGE_SHIFT;
+            int wait_cnt = 0;
 
             while (gfn >= max_sent_gpfn) {
+                wait_cnt++;
+                if (wait_cnt>1) return;
                 g_usleep(50000);
             }
             if (is_complete_stage) prehashing_exit();

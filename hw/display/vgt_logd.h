@@ -54,5 +54,6 @@ bool vgt_gpu_releated(unsigned long gfn);
 bool vgt_page_is_predirtied(unsigned long gfn);
 void vgt_start_prehashing(void);
 void vgt_logd_init(void);
+void* vgt_get_prehashing_dirty_bitmap(void);
 
 #endif

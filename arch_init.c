@@ -117,7 +117,7 @@ static int dirty_rate_high_cnt;
 static void check_guest_throttling(void);
 
 static uint64_t bitmap_sync_count;
-static uint64_t prehashing_hit_count = 0;
+//static uint64_t prehashing_hit_count = 0;
 
 
 extern uint64_t migration_time_base_ns;
@@ -674,9 +674,15 @@ static void remove_cpu_dirty_from_gpu(void)
 //    DPRINTF("before cleaning:\n");
 //    cpu_gpu_bitmap_dump();
 
+    unsigned long *predirty = vgt_get_prehashing_dirty_bitmap();
+
     trace_remove_cpu_dirty_from_gpu_begin(get_mig_time());
 
     for (i=0; i<bitmap_longs; i++) {
+        migration_dirty_pages -= ctpopl(migration_bitmap[i]);
+        migration_bitmap[i] |= predirty[i];
+        migration_dirty_pages += ctpopl(migration_bitmap[i]);
+
         vgpu_dirty_pages -= ctpopl(vgpu_bitmap[i]);
         vgpu_bitmap[i] &= (~migration_bitmap[i]);
         vgpu_dirty_pages += ctpopl(vgpu_bitmap[i]);
@@ -929,20 +935,12 @@ static int gm_save_page(QEMUFile *f, RAMBlock* block, ram_addr_t offset,
          * not dirty, we skip it
          */
 
-        if (vgt_page_is_predirtied(current_addr >> TARGET_PAGE_BITS)) {
-            //printf("a\n");
-            prehashing_hit_count++;
-            goto send_page_begin;
-        }
-
         hash_gpu_pages_count++;
         if (!vgt_page_is_modified(p, current_addr >> TARGET_PAGE_BITS)) {
             skip_by_hashing++;
             return 0;
         }
     }
-
-send_page_begin:
 
     if (block == last_sent_block) {
         offset |= RAM_SAVE_FLAG_CONTINUE;

@@ -223,6 +223,7 @@ ram_addr_t vgpu_bitmap_find_dirty(MemoryRegion *mr,
     return (next - base) << TARGET_PAGE_BITS;
 }
 
+static int pre_hash_hit_counter = 0;
 extern bool is_complete_stage;
 static void
 vgt_prehashing_iterate(void) {
@@ -241,12 +242,18 @@ vgt_prehashing_iterate(void) {
             if (offset >= block->used_length) break;
             curr_addr = block->offset + offset;
             gfn = curr_addr >> VGT_PAGE_SHIFT;
+
+            if (vgt_page_is_predirtied(gfn)) {
+                offset+=4096;
+                continue;
+            }
+
             int wait_cnt = 0;
 
             while (gfn >= max_sent_gpfn) {
                 wait_cnt++;
                 if (wait_cnt>1) return;
-                g_usleep(50000);
+                g_usleep(5000);
             }
             if (is_complete_stage) prehashing_exit();
 
@@ -256,6 +263,7 @@ vgt_prehashing_iterate(void) {
 
             if (is_modified) {
                 set_bit(gfn, logd_pre_dirty_bitmap);
+                pre_hash_hit_counter++;
             }
             offset+=4096;
         }
@@ -265,7 +273,8 @@ vgt_prehashing_iterate(void) {
 static void*
 do_vgt_prehashing_thread(void *opaque) {
     while (1) {
-        g_usleep(50000);
+        g_usleep(5000);
+        DPRINTF("prehashing iterating: %d\n", pre_hash_hit_counter);
         vgt_prehashing_iterate();
     }
     return NULL;

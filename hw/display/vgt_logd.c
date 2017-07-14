@@ -252,8 +252,8 @@ vgt_prehashing_iterate(void) {
 
             while (gfn >= max_sent_gpfn) {
                 wait_cnt++;
-                if (wait_cnt>1) return;
-                g_usleep(5000);
+                if (wait_cnt>2) return;
+                g_usleep(10000);
             }
             if (is_complete_stage) prehashing_exit();
 
@@ -273,7 +273,7 @@ vgt_prehashing_iterate(void) {
 static void*
 do_vgt_prehashing_thread(void *opaque) {
     while (1) {
-        g_usleep(5000);
+        g_usleep(10000);
         DPRINTF("prehashing iterating: %d\n", pre_hash_hit_counter);
         vgt_prehashing_iterate();
     }

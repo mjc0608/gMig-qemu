@@ -659,7 +659,7 @@ static void cpu_gpu_bitmap_dump(void) {
         if (gpu_set) gpu_cnt++;
         if (cpu_set && gpu_set) cnt++;
     }
-    DPRINTF("cpu: %d, gpu: %d, conflict: %d\n", cpu_cnt, gpu_cnt, cnt);
+    printf("cpu: %d, gpu: %d, conflict: %d\n", cpu_cnt, gpu_cnt, cnt);
 }
 #endif
 
@@ -672,16 +672,16 @@ static void remove_cpu_dirty_from_gpu(void)
     int i;
 
 //    DPRINTF("before cleaning:\n");
-//    cpu_gpu_bitmap_dump();
+    //cpu_gpu_bitmap_dump();
 
-    unsigned long *predirty = vgt_get_prehashing_dirty_bitmap();
+//    unsigned long *predirty = vgt_get_prehashing_dirty_bitmap();
 
     trace_remove_cpu_dirty_from_gpu_begin(get_mig_time());
 
     for (i=0; i<bitmap_longs; i++) {
-        migration_dirty_pages -= ctpopl(migration_bitmap[i]);
-        migration_bitmap[i] |= predirty[i];
-        migration_dirty_pages += ctpopl(migration_bitmap[i]);
+//        migration_dirty_pages -= ctpopl(migration_bitmap[i]);
+//        migration_bitmap[i] |= predirty[i];
+//        migration_dirty_pages += ctpopl(migration_bitmap[i]);
 
         vgpu_dirty_pages -= ctpopl(vgpu_bitmap[i]);
         vgpu_bitmap[i] &= (~migration_bitmap[i]);
@@ -690,7 +690,7 @@ static void remove_cpu_dirty_from_gpu(void)
     trace_remove_cpu_dirty_from_gpu_begin(get_mig_time());
 
 //    DPRINTF("after cleanning:\n");
-//    cpu_gpu_bitmap_dump();
+    ///cpu_gpu_bitmap_dump();
 }
 #endif
 #if 0
@@ -936,11 +936,15 @@ static int gm_save_page(QEMUFile *f, RAMBlock* block, ram_addr_t offset,
          */
 
         hash_gpu_pages_count++;
+        if (vgt_page_is_predirtied(current_addr >> TARGET_PAGE_BITS))
+            goto page_send;
         if (!vgt_page_is_modified(p, current_addr >> TARGET_PAGE_BITS)) {
             skip_by_hashing++;
             return 0;
         }
     }
+
+page_send:
 
     if (block == last_sent_block) {
         offset |= RAM_SAVE_FLAG_CONTINUE;

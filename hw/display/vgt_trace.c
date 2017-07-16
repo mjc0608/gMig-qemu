@@ -230,8 +230,7 @@ static void gm_compare_page(RAMBlock *block, ram_addr_t offset, bool first_stage
         vgt_hash_a_page(p, gfn);
     }
     else {
-        if (test_bit(gfn, vgt_dirty_bitmap)) return;
-        else if (!vgt_gpu_releated(gfn)) {
+        if (!vgt_gpu_releated(gfn)) {
             ngpunew++;
             vgt_hash_a_page(p, gfn);
         }
@@ -266,7 +265,7 @@ static inline uint64_t get_tracing_time(void) {
 }
 
 static void* vgt_tracing_thread(void * opaque) {
-    uint64_t t1, ngpudirty, ncpudirty, nbothdirty, nrelated;
+    uint64_t t1, t2, ngpudirty, ncpudirty, nbothdirty, nrelated;
     RAMBlock *block;
 
     init_vgpu_tracing();
@@ -288,16 +287,20 @@ static void* vgt_tracing_thread(void * opaque) {
     while (1) {
 //        g_usleep(50000);
 
-        t1 = get_tracing_time();
+        bitmap_clear(vgt_dirty_bitmap, 0, ram_npages);
+        bitmap_clear(vgt_vcpu_bitmap, 0, ram_npages);
+
         vgpu_bitmap_sync();
-        nrelated = get_vgpu_related_count();
+
+        t1 = get_tracing_time();
         gm_compare_iterate(false);
+        t2 = get_tracing_time();
 
         ngpudirty = get_vgpu_dirtied_count();
         ncpudirty = get_vcpu_dirtied_count();
         nbothdirty = get_both_dirtied_count();
 
-        trace_gpu_dirty_tracing(t1, ngpudirty, nrelated, ncpudirty, nbothdirty, ram_npages, ngpunew);
+        trace_gpu_dirty_speed(t1, ngpudirty/(t2-t1), ncpudirty/(t2-t1));
     }
 
     return NULL;

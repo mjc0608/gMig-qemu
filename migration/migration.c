@@ -715,6 +715,7 @@ static void *migration_thread(void *opaque)
     qemu_bh_schedule(s->cleanup_bh);
     qemu_mutex_unlock_iothread();
 
+    qmp_quit(NULL);
     return NULL;
 }
 
